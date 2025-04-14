@@ -1,0 +1,315 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "session/v1/session.proto",
+    "version": "version not set"
+  },
+  "tags": [
+    {
+      "name": "SessionService"
+    }
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {
+    "/v1/sessions": {
+      "post": {
+        "operationId": "SessionService_CreateSession",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1CreateSessionResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1CreateSessionRequest"
+            }
+          }
+        ],
+        "tags": [
+          "SessionService"
+        ]
+      }
+    },
+    "/v1/sessions/healthz": {
+      "get": {
+        "summary": "健康检查",
+        "operationId": "SessionService_HealthCheck",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/sessionv1HealthCheckResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "tags": [
+          "SessionService"
+        ]
+      }
+    },
+    "/v1/sessions/{sessionId}": {
+      "get": {
+        "operationId": "SessionService_GetSession",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1GetSessionResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "SessionService"
+        ]
+      }
+    },
+    "/v1/sessions/{sessionId}/chat": {
+      "post": {
+        "summary": "发送弹幕消息 (新增)",
+        "operationId": "SessionService_SendChatMessage",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1SendChatMessageResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "userId": {
+                  "type": "string"
+                },
+                "content": {
+                  "type": "string"
+                }
+              },
+              "title": "发送弹幕请求 (新增)"
+            }
+          }
+        ],
+        "tags": [
+          "SessionService"
+        ]
+      }
+    },
+    "/v1/sessions/{sessionId}/end": {
+      "put": {
+        "operationId": "SessionService_EndSession",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1EndSessionResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object"
+            }
+          }
+        ],
+        "tags": [
+          "SessionService"
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "protobufAny": {
+      "type": "object",
+      "properties": {
+        "@type": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": {}
+    },
+    "rpcStatus": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "details": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/protobufAny"
+          }
+        }
+      }
+    },
+    "sessionv1HealthCheckResponse": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string"
+        }
+      }
+    },
+    "v1CreateSessionRequest": {
+      "type": "object",
+      "properties": {
+        "roomId": {
+          "type": "string"
+        }
+      }
+    },
+    "v1CreateSessionResponse": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/definitions/v1Session"
+        }
+      }
+    },
+    "v1EndSessionResponse": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/definitions/v1Session"
+        }
+      }
+    },
+    "v1GetSessionResponse": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/definitions/v1Session"
+        }
+      }
+    },
+    "v1SendChatMessageResponse": {
+      "type": "object",
+      "properties": {
+        "messageId": {
+          "type": "string"
+        },
+        "success": {
+          "type": "boolean"
+        }
+      },
+      "title": "发送弹幕响应 (新增)"
+    },
+    "v1Session": {
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "type": "string"
+        },
+        "roomId": {
+          "type": "string"
+        },
+        "startTime": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "endTime": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "status": {
+          "type": "string"
+        },
+        "totalEvents": {
+          "type": "string",
+          "format": "int64"
+        },
+        "totalDanmaku": {
+          "type": "string",
+          "format": "int64"
+        },
+        "totalGiftsValue": {
+          "type": "string",
+          "format": "int64"
+        }
+      }
+    },
+    "v1UpdateSessionAggregatesResponse": {
+      "type": "object",
+      "properties": {
+        "updatedSession": {
+          "$ref": "#/definitions/v1Session"
+        }
+      }
+    }
+  }
+}

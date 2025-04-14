@@ -1,0 +1,169 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "realtime/v1/realtime.proto",
+    "version": "version not set"
+  },
+  "tags": [
+    {
+      "name": "RealtimeService"
+    }
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {
+    "/v1/realtime/healthz": {
+      "get": {
+        "operationId": "RealtimeService_HealthCheck",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/realtimev1HealthCheckResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "tags": [
+          "RealtimeService"
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "protobufAny": {
+      "type": "object",
+      "properties": {
+        "@type": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": {}
+    },
+    "realtimev1HealthCheckResponse": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string"
+        }
+      }
+    },
+    "rpcStatus": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "details": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/protobufAny"
+          }
+        }
+      }
+    },
+    "v1ChatMessage": {
+      "type": "object",
+      "properties": {
+        "messageId": {
+          "type": "string"
+        },
+        "sessionId": {
+          "type": "string"
+        },
+        "userId": {
+          "type": "string"
+        },
+        "content": {
+          "type": "string"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "v1GiftSent": {
+      "type": "object",
+      "properties": {
+        "giftEventId": {
+          "type": "string"
+        },
+        "sessionId": {
+          "type": "string"
+        },
+        "fromUserId": {
+          "type": "string"
+        },
+        "toUserId": {
+          "type": "string"
+        },
+        "giftId": {
+          "type": "string"
+        },
+        "quantity": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "cost": {
+          "type": "string",
+          "format": "int64"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "v1SessionEvent": {
+      "type": "object",
+      "properties": {
+        "userPresence": {
+          "$ref": "#/definitions/v1UserPresence"
+        },
+        "chatMessage": {
+          "$ref": "#/definitions/v1ChatMessage"
+        },
+        "giftSent": {
+          "$ref": "#/definitions/v1GiftSent"
+        }
+      }
+    },
+    "v1UserPresence": {
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "type": "string"
+        },
+        "userId": {
+          "type": "string"
+        },
+        "entered": {
+          "type": "boolean"
+        },
+        "currentOnlineCount": {
+          "type": "string",
+          "format": "int64"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,14 @@
+syntax = "proto3";
+package aggregation.v1;
+import "google/protobuf/empty.proto";
+import "google/api/annotations.proto";
+import "session/v1/session.proto";
+// !!! 替换模块路径 !!!
+option go_package = "go-xlive/gen/go/aggregation/v1;aggregationv1";
+service AggregationService {
+  rpc TriggerAggregation(TriggerAggregationRequest) returns (TriggerAggregationResponse) { option (google.api.http) = { post: "/v1/aggregation/trigger" body: "*" }; }
+  rpc HealthCheck(google.protobuf.Empty) returns (HealthCheckResponse) { option (google.api.http) = { get: "/v1/aggregation/healthz" }; }
+}
+message TriggerAggregationRequest { string session_id = 1; }
+message TriggerAggregationResponse { session.v1.Session updated_session = 1; }
+message HealthCheckResponse { string status = 1; }

@@ -1,0 +1,14 @@
+syntax = "proto3";
+package realtime.v1;
+import "google/protobuf/empty.proto";
+import "google/api/annotations.proto";
+import "event/v1/event.proto"; // 导入事件类型
+// !!! 替换模块路径 !!!
+option go_package = "go-xlive/gen/go/realtime/v1;realtimev1";
+service RealtimeService {
+  rpc SubscribeSessionEvents(SubscribeSessionEventsRequest) returns (stream SessionEvent); // 服务器流
+  rpc HealthCheck(google.protobuf.Empty) returns (HealthCheckResponse) {option (google.api.http) = {get: "/v1/realtime/healthz"};}
+}
+message SubscribeSessionEventsRequest {string session_id = 1;}
+message SessionEvent {oneof event {event.v1.UserPresence user_presence = 1; event.v1.ChatMessage chat_message = 2; event.v1.GiftSent gift_sent = 3;}}
+message HealthCheckResponse {string status = 1;}

@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package user.v1;
+
+import "google/api/annotations.proto";
+import "google/protobuf/empty.proto"; // 导入 Empty
+
+// !!! 替换模块路径 !!!
+option go_package = "go-xlive/gen/go/user/v1;userv1";
+
+service UserService {
+  rpc CreateUser(CreateUserRequest) returns (CreateUserResponse) {
+    option (google.api.http) = { post: "/v1/users" body: "*" };
+  }
+  rpc GetUser(GetUserRequest) returns (GetUserResponse) {
+    option (google.api.http) = { get: "/v1/users/{user_id}" };
+  }
+  // 健康检查 (新增)
+  rpc HealthCheck(google.protobuf.Empty) returns (HealthCheckResponse) {
+    option (google.api.http) = { get: "/v1/users/healthz" };
+  }
+}
+
+message User { string user_id = 1; string username = 2; }
+message CreateUserRequest { string username = 1; }
+message CreateUserResponse { User user = 1; }
+message GetUserRequest { string user_id = 1; }
+message GetUserResponse { User user = 1; }
+// 健康检查响应 (新增)
+message HealthCheckResponse { string status = 1; } // e.g., "SERVING"

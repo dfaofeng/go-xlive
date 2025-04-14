@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package room.v1;
+
+import "google/api/annotations.proto";
+import "user/v1/user.proto";
+import "google/protobuf/empty.proto";
+
+// !!! 替换模块路径 !!!
+option go_package = "go-xlive/gen/go/room/v1;roomv1";
+
+service RoomService {
+  rpc CreateRoom(CreateRoomRequest) returns (CreateRoomResponse) {
+    option (google.api.http) = { post: "/v1/rooms" body: "*" };
+  }
+  rpc GetRoom(GetRoomRequest) returns (GetRoomResponse) {
+    option (google.api.http) = { get: "/v1/rooms/{room_id}" };
+  }
+  // 健康检查 (新增)
+  rpc HealthCheck(google.protobuf.Empty) returns (HealthCheckResponse) {
+    option (google.api.http) = { get: "/v1/rooms/healthz" };
+  }
+}
+
+message Room { string room_id = 1; string room_name = 2; string owner_user_id = 3; string status = 4; }
+message CreateRoomRequest { string room_name = 1; string owner_user_id = 2; }
+message CreateRoomResponse { Room room = 1; }
+message GetRoomRequest { string room_id = 1; }
+message GetRoomResponse { Room room = 1; user.v1.User owner = 2; }
+// 健康检查响应 (新增)
+message HealthCheckResponse { string status = 1; }

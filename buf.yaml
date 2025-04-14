@@ -1,0 +1,12 @@
+version: v2
+modules:
+  - path: proto # 指定 proto 文件夹作为模块路径
+deps:
+  - buf.build/googleapis/googleapis         # 核心 Google API 和 Protobuf 定义
+#   - buf.build/grpc-ecosystem/grpc-gateway # grpc-gateway 相关定义
+lint:
+  use:
+    - DEFAULT # 开始时用 DEFAULT，后续可改为 STANDARD
+breaking:
+  use:
+    - FILE

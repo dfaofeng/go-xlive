@@ -1,0 +1,162 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "aggregation/v1/aggregation.proto",
+    "version": "version not set"
+  },
+  "tags": [
+    {
+      "name": "AggregationService"
+    }
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {
+    "/v1/aggregation/healthz": {
+      "get": {
+        "operationId": "AggregationService_HealthCheck",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/aggregationv1HealthCheckResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "tags": [
+          "AggregationService"
+        ]
+      }
+    },
+    "/v1/aggregation/trigger": {
+      "post": {
+        "operationId": "AggregationService_TriggerAggregation",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1TriggerAggregationResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1TriggerAggregationRequest"
+            }
+          }
+        ],
+        "tags": [
+          "AggregationService"
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "aggregationv1HealthCheckResponse": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string"
+        }
+      }
+    },
+    "protobufAny": {
+      "type": "object",
+      "properties": {
+        "@type": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": {}
+    },
+    "rpcStatus": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "details": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/protobufAny"
+          }
+        }
+      }
+    },
+    "v1Session": {
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "type": "string"
+        },
+        "roomId": {
+          "type": "string"
+        },
+        "startTime": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "endTime": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "status": {
+          "type": "string"
+        },
+        "totalEvents": {
+          "type": "string",
+          "format": "int64"
+        },
+        "totalDanmaku": {
+          "type": "string",
+          "format": "int64"
+        },
+        "totalGiftsValue": {
+          "type": "string",
+          "format": "int64"
+        }
+      }
+    },
+    "v1TriggerAggregationRequest": {
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "type": "string"
+        }
+      }
+    },
+    "v1TriggerAggregationResponse": {
+      "type": "object",
+      "properties": {
+        "updatedSession": {
+          "$ref": "#/definitions/v1Session"
+        }
+      }
+    }
+  }
+}

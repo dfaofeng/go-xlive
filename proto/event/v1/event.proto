@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package event.v1;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+import "google/api/annotations.proto";
+
+// !!! 替换模块路径 !!!
+option go_package = "go-xlive/gen/go/event/v1;eventv1";
+
+// 事件处理与存储服务
+service EventService {
+  // 查询指定场次的事件
+  rpc QueryEvents(QueryEventsRequest) returns (QueryEventsResponse) {
+    option (google.api.http) = {
+      post: "/v1/events:query" // 使用 POST 查询更灵活
+      body: "*"
+    };
+  }
+  // 健康检查
+  rpc HealthCheck(google.protobuf.Empty) returns (HealthCheckResponse) {
+    option (google.api.http) = {
+      get: "/v1/events/healthz"
+    };
+  }
+}
+
+enum EventType { EVENT_TYPE_UNSPECIFIED = 0; EVENT_TYPE_USER_PRESENCE = 1; EVENT_TYPE_CHAT_MESSAGE = 2; EVENT_TYPE_GIFT = 3; EVENT_TYPE_ROOM_STATUS = 4; }
+message StoredEvent { string event_id = 1; string session_id = 2; string room_id = 10; /* 新增关联房间 */ EventType event_type = 3; google.protobuf.Timestamp timestamp = 4; string user_id = 5; bytes data = 6; } // 假设 event_id 现在是 string (UUID string)
+message QueryEventsRequest { string session_id = 1; google.protobuf.Timestamp start_time = 2; google.protobuf.Timestamp end_time = 3; EventType event_type = 4; int32 limit = 5; int32 offset = 6; }
+message QueryEventsResponse { repeated StoredEvent events = 1; int32 total_count = 2; }
+message HealthCheckResponse { string status = 1; }
+// --- 具体事件类型定义 ---
+message RoomStatusChanged { string room_id = 1; string new_status = 2; google.protobuf.Timestamp timestamp = 3; }
+message SessionEnded { string session_id = 1; string room_id = 2; google.protobuf.Timestamp end_time = 3; }
+message UserPresence { string session_id = 1; string user_id = 2; bool entered = 3; int64 current_online_count = 4; google.protobuf.Timestamp timestamp = 5; }
+message ChatMessage { string message_id = 1; string session_id = 2; string user_id = 3; string content = 4; google.protobuf.Timestamp timestamp = 5; }
+message GiftSent { string gift_event_id = 1; string session_id = 2; string from_user_id = 3; string to_user_id = 4; string gift_id = 5; int32 quantity = 6; int64 cost = 7; google.protobuf.Timestamp timestamp = 8; }

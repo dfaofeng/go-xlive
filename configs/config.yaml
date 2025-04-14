@@ -1,0 +1,40 @@
+server:
+  user:
+    grpc_port: 50051
+  room:
+    grpc_port: 50052
+  session:
+    grpc_port: 50053
+  event:            # 新增
+    grpc_port: 50054
+  aggregation:      # 新增
+    grpc_port: 50055
+  realtime:         # 新增
+    grpc_port: 50056
+  gateway:
+    http_port: 8080
+
+client:
+  user_service:
+    addresses: ["localhost:50051"]
+  room_service:
+    addresses: ["localhost:50052"]
+  session_service:
+    addresses: ["localhost:50053"]
+  event_service:      # 新增
+    addresses: ["localhost:50054"]
+  aggregation_service: # 新增
+    addresses: ["localhost:50055"]
+  realtime_service:    # 新增
+    addresses: ["localhost:50056"]
+
+database:
+  postgres_dsn: "postgres://user:password@fnos:123/liveroomdb?sslmode=disable"
+
+redis:
+  addr: "fnos:124"
+  password: ""
+  db: 0
+
+nats:
+  url: "nats://fnos:125"

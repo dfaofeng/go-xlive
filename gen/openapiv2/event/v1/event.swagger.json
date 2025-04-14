@@ -1,0 +1,196 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "event/v1/event.proto",
+    "version": "version not set"
+  },
+  "tags": [
+    {
+      "name": "EventService"
+    }
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {
+    "/v1/events/healthz": {
+      "get": {
+        "summary": "健康检查",
+        "operationId": "EventService_HealthCheck",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/eventv1HealthCheckResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "tags": [
+          "EventService"
+        ]
+      }
+    },
+    "/v1/events:query": {
+      "post": {
+        "summary": "查询指定场次的事件",
+        "operationId": "EventService_QueryEvents",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1QueryEventsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1QueryEventsRequest"
+            }
+          }
+        ],
+        "tags": [
+          "EventService"
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "eventv1HealthCheckResponse": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string"
+        }
+      }
+    },
+    "protobufAny": {
+      "type": "object",
+      "properties": {
+        "@type": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": {}
+    },
+    "rpcStatus": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "details": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/protobufAny"
+          }
+        }
+      }
+    },
+    "v1EventType": {
+      "type": "string",
+      "enum": [
+        "EVENT_TYPE_UNSPECIFIED",
+        "EVENT_TYPE_USER_PRESENCE",
+        "EVENT_TYPE_CHAT_MESSAGE",
+        "EVENT_TYPE_GIFT",
+        "EVENT_TYPE_ROOM_STATUS"
+      ],
+      "default": "EVENT_TYPE_UNSPECIFIED"
+    },
+    "v1QueryEventsRequest": {
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "type": "string"
+        },
+        "startTime": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "endTime": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "eventType": {
+          "$ref": "#/definitions/v1EventType"
+        },
+        "limit": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "offset": {
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
+    "v1QueryEventsResponse": {
+      "type": "object",
+      "properties": {
+        "events": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1StoredEvent"
+          }
+        },
+        "totalCount": {
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
+    "v1StoredEvent": {
+      "type": "object",
+      "properties": {
+        "eventId": {
+          "type": "string"
+        },
+        "sessionId": {
+          "type": "string"
+        },
+        "roomId": {
+          "type": "string"
+        },
+        "eventType": {
+          "$ref": "#/definitions/v1EventType"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "userId": {
+          "type": "string"
+        },
+        "data": {
+          "type": "string",
+          "format": "byte"
+        }
+      }
+    }
+  }
+}

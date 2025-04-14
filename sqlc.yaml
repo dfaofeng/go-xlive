@@ -1,0 +1,22 @@
+version: "2"
+sql:
+  # User Service Queries
+  - engine: "postgresql"
+    queries: "internal/user/repository/query.sql"
+    schema: "internal/user/repository/schema.sql"
+    gen: {go: {package: "db", out: "internal/user/repository/db", sql_package: "pgx/v5", emit_json_tags: true, emit_interface: false, emit_exact_table_names: false, emit_empty_slices: true}}
+  # Room Service Queries
+  - engine: "postgresql"
+    queries: "internal/room/repository/query.sql"
+    schema: "internal/room/repository/schema.sql"
+    gen: {go: {package: "db", out: "internal/room/repository/db", sql_package: "pgx/v5", emit_json_tags: true, emit_interface: false, emit_exact_table_names: false, emit_empty_slices: true}}
+  # Event Service Queries (新增)
+  - engine: "postgresql"
+    queries: "internal/event/repository/query.sql"
+    schema: "internal/event/repository/schema.sql"
+    gen: {go: {package: "db", out: "internal/event/repository/db", sql_package: "pgx/v5", emit_json_tags: true, emit_interface: false, emit_exact_table_names: false, emit_empty_slices: true}}
+  # Session Service Queries (更新)
+  - engine: "postgresql"
+    queries: "internal/session/repository/query.sql" # 已添加 Update Aggregates
+    schema: "internal/session/repository/schema.sql"   # 已添加聚合字段
+    gen: {go: {package: "db", out: "internal/session/repository/db", sql_package: "pgx/v5", emit_json_tags: true, emit_interface: false, emit_exact_table_names: false, emit_empty_slices: true}}

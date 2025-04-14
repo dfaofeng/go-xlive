@@ -1,0 +1,60 @@
+syntax = "proto3";
+
+package session.v1;
+
+import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
+// !!! 替换模块路径 !!!
+option go_package = "go-xlive/gen/go/session/v1;sessionv1";
+
+service SessionService {
+  rpc CreateSession(CreateSessionRequest) returns (CreateSessionResponse) {
+    option (google.api.http) = { post: "/v1/sessions" body: "*" };
+  }
+  rpc EndSession(EndSessionRequest) returns (EndSessionResponse) {
+    option (google.api.http) = { put: "/v1/sessions/{session_id}/end" body: "*" };
+  }
+  rpc GetSession(GetSessionRequest) returns (GetSessionResponse) {
+    option (google.api.http) = { get: "/v1/sessions/{session_id}" };
+  }
+  // 更新场次聚合统计 (新增)
+  rpc UpdateSessionAggregates(UpdateSessionAggregatesRequest) returns (UpdateSessionAggregatesResponse);
+  // 健康检查
+  rpc HealthCheck(google.protobuf.Empty) returns (HealthCheckResponse) {
+    option (google.api.http) = { get: "/v1/sessions/healthz" };
+  }
+  // 发送弹幕消息 (新增)
+  rpc SendChatMessage(SendChatMessageRequest) returns (SendChatMessageResponse) {
+    option (google.api.http) = {
+      post: "/v1/sessions/{session_id}/chat"
+      body: "*"
+    };
+  }
+}
+
+message Session {
+  string session_id = 1;
+  string room_id = 2;
+  google.protobuf.Timestamp start_time = 3;
+  google.protobuf.Timestamp end_time = 4;
+  string status = 5;
+  int64 total_events = 6;
+  int64 total_danmaku = 7;
+  int64 total_gifts_value = 8;
+}
+
+message CreateSessionRequest { string room_id = 1; }
+message CreateSessionResponse { Session session = 1; }
+message EndSessionRequest { string session_id = 1; }
+message EndSessionResponse { Session session = 1; }
+message GetSessionRequest { string session_id = 1; }
+message GetSessionResponse { Session session = 1; }
+message UpdateSessionAggregatesRequest { string session_id = 1; int64 total_events = 2; int64 total_danmaku = 3; int64 total_gifts_value = 4; }
+message UpdateSessionAggregatesResponse { Session updated_session = 1; }
+// 发送弹幕请求 (新增)
+message SendChatMessageRequest { string session_id = 1; string user_id = 2; string content = 3; }
+// 发送弹幕响应 (新增)
+message SendChatMessageResponse { string message_id = 1; bool success = 2; }
+message HealthCheckResponse { string status = 1; }
