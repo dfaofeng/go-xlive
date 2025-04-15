@@ -2,7 +2,6 @@ package repository
 
 import (
 	"context"
-	// "database/sql" // pgtype 包含了处理 null 的方法
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -12,9 +11,12 @@ import (
 
 type Repository interface {
 	CreateEvent(context.Context, db.CreateEventParams) error
-	QueryEventsBySessionID(ctx context.Context, sessionID pgtype.Text) ([]db.Event, error) // 参数改为 pgtype.Text
-	QueryEventsBySessionIDAndType(context.Context, db.QueryEventsBySessionIDAndTypeParams) ([]db.Event, error)
-	Ping(ctx context.Context) error // 添加 Ping 方法
+	// --- 修改查询方法签名以匹配新的 SQL 参数 ---
+	QueryEventsBySessionID(ctx context.Context, arg db.QueryEventsBySessionIDParams) ([]db.Event, error)
+	QueryEventsBySessionIDAndType(ctx context.Context, arg db.QueryEventsBySessionIDAndTypeParams) ([]db.Event, error)
+	CountEventsBySessionID(ctx context.Context, arg db.CountEventsBySessionIDParams) (int64, error) // <--- 新增 Count 方法
+	// --- 修改结束 ---
+	Ping(ctx context.Context) error
 }
 
 type postgresRepository struct {
@@ -26,15 +28,21 @@ func NewRepository(p *pgxpool.Pool) Repository { return &postgresRepository{p, d
 func (r *postgresRepository) CreateEvent(c context.Context, a db.CreateEventParams) error {
 	return r.queries.CreateEvent(c, a)
 }
-func (r *postgresRepository) QueryEventsBySessionID(c context.Context, sid pgtype.Text) ([]db.Event, error) {
-	return r.queries.QueryEventsBySessionID(c, sid)
+
+// --- 修改查询方法实现 ---
+func (r *postgresRepository) QueryEventsBySessionID(c context.Context, arg db.QueryEventsBySessionIDParams) ([]db.Event, error) {
+	return r.queries.QueryEventsBySessionID(c, arg)
 }
 func (r *postgresRepository) QueryEventsBySessionIDAndType(c context.Context, a db.QueryEventsBySessionIDAndTypeParams) ([]db.Event, error) {
 	return r.queries.QueryEventsBySessionIDAndType(c, a)
 }
-func (r *postgresRepository) Ping(ctx context.Context) error { return r.db.Ping(ctx) } // 实现 Ping
+func (r *postgresRepository) CountEventsBySessionID(c context.Context, arg db.CountEventsBySessionIDParams) (int64, error) {
+	return r.queries.CountEventsBySessionID(c, arg)
+} // <--- 新增 Count 实现
+// --- 修改结束 ---
+func (r *postgresRepository) Ping(ctx context.Context) error { return r.db.Ping(ctx) }
 
-// 辅助函数 (可选, service 层也可以处理)
+// uuidBytesToString 辅助函数 (可选)
 func uuidBytesToString(uuidBytes pgtype.UUID) string {
 	if !uuidBytes.Valid {
 		return ""

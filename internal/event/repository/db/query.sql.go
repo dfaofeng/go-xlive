@@ -11,6 +11,37 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countEventsBySessionID = `-- name: CountEventsBySessionID :one
+
+SELECT count(*)
+FROM events
+WHERE session_id = $1              -- $1
+  AND ($2::TIMESTAMPTZ IS NULL OR event_time >= $2)  -- $2
+  AND ($3::TIMESTAMPTZ IS NULL OR event_time <= $3)      -- $3
+  AND ($4::TEXT IS NULL OR event_type = $4)
+`
+
+type CountEventsBySessionIDParams struct {
+	SessionID       pgtype.Text        `json:"session_id"`
+	StartTime       pgtype.Timestamptz `json:"start_time"`
+	EndTime         pgtype.Timestamptz `json:"end_time"`
+	EventTypeFilter string             `json:"event_type_filter"`
+}
+
+// $6
+// 修改：为所有参数添加 sqlc.arg() 注释
+func (q *Queries) CountEventsBySessionID(ctx context.Context, arg CountEventsBySessionIDParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countEventsBySessionID,
+		arg.SessionID,
+		arg.StartTime,
+		arg.EndTime,
+		arg.EventTypeFilter,
+	)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createEvent = `-- name: CreateEvent :exec
 INSERT INTO events (session_id, room_id, event_type, user_id, event_time, data)
 VALUES ($1, $2, $3, $4, $5, $6)
@@ -25,7 +56,6 @@ type CreateEventParams struct {
 	Data      []byte             `json:"data"`
 }
 
-// 存储一个事件，包含 room_id
 func (q *Queries) CreateEvent(ctx context.Context, arg CreateEventParams) error {
 	_, err := q.db.Exec(ctx, createEvent,
 		arg.SessionID,
@@ -41,14 +71,31 @@ func (q *Queries) CreateEvent(ctx context.Context, arg CreateEventParams) error 
 const queryEventsBySessionID = `-- name: QueryEventsBySessionID :many
 SELECT event_id, session_id, room_id, event_type, user_id, event_time, data, created_at
 FROM events
-WHERE session_id = $1
+WHERE session_id = $1 -- $1
+  AND ($2::TIMESTAMPTZ IS NULL OR event_time >= $2) -- $2
+  AND ($3::TIMESTAMPTZ IS NULL OR event_time <= $3)     -- $3
 ORDER BY event_time ASC
+    LIMIT $5  -- $4 (使用 'lim' 作为字段名示例)
+OFFSET $4
 `
 
-// 查询指定场次的所有事件 (按时间排序)
-// TODO: 添加分页和时间范围过滤
-func (q *Queries) QueryEventsBySessionID(ctx context.Context, sessionID pgtype.Text) ([]Event, error) {
-	rows, err := q.db.Query(ctx, queryEventsBySessionID, sessionID)
+type QueryEventsBySessionIDParams struct {
+	SessionID pgtype.Text        `json:"session_id"`
+	StartTime pgtype.Timestamptz `json:"start_time"`
+	EndTime   pgtype.Timestamptz `json:"end_time"`
+	Offs      int32              `json:"offs"`
+	Lim       int32              `json:"lim"`
+}
+
+// 修改：为所有参数添加 sqlc.arg() 注释以生成明确的字段名
+func (q *Queries) QueryEventsBySessionID(ctx context.Context, arg QueryEventsBySessionIDParams) ([]Event, error) {
+	rows, err := q.db.Query(ctx, queryEventsBySessionID,
+		arg.SessionID,
+		arg.StartTime,
+		arg.EndTime,
+		arg.Offs,
+		arg.Lim,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -77,21 +124,38 @@ func (q *Queries) QueryEventsBySessionID(ctx context.Context, sessionID pgtype.T
 }
 
 const queryEventsBySessionIDAndType = `-- name: QueryEventsBySessionIDAndType :many
+
 SELECT event_id, session_id, room_id, event_type, user_id, event_time, data, created_at
 FROM events
-WHERE session_id = $1 AND event_type = $2
+WHERE session_id = $1             -- $1
+  AND event_type = $2           -- $2
+  AND ($3::TIMESTAMPTZ IS NULL OR event_time >= $3) -- $3
+  AND ($4::TIMESTAMPTZ IS NULL OR event_time <= $4)     -- $4
 ORDER BY event_time ASC
+    LIMIT $6                               -- $5
+OFFSET $5
 `
 
 type QueryEventsBySessionIDAndTypeParams struct {
-	SessionID pgtype.Text `json:"session_id"`
-	EventType string      `json:"event_type"`
+	SessionID pgtype.Text        `json:"session_id"`
+	EventType string             `json:"event_type"`
+	StartTime pgtype.Timestamptz `json:"start_time"`
+	EndTime   pgtype.Timestamptz `json:"end_time"`
+	Offs      int32              `json:"offs"`
+	Lim       int32              `json:"lim"`
 }
 
-// 查询指定场次和类型的事件
-// TODO: 添加分页和时间范围过滤
+// $5 (使用 'offs' 作为字段名示例)
+// 修改：为所有参数添加 sqlc.arg() 注释
 func (q *Queries) QueryEventsBySessionIDAndType(ctx context.Context, arg QueryEventsBySessionIDAndTypeParams) ([]Event, error) {
-	rows, err := q.db.Query(ctx, queryEventsBySessionIDAndType, arg.SessionID, arg.EventType)
+	rows, err := q.db.Query(ctx, queryEventsBySessionIDAndType,
+		arg.SessionID,
+		arg.EventType,
+		arg.StartTime,
+		arg.EndTime,
+		arg.Offs,
+		arg.Lim,
+	)
 	if err != nil {
 		return nil, err
 	}

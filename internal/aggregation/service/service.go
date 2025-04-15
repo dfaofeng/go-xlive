@@ -4,12 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log" // 保留 log 用于 New 函数检查
-	// "runtime" // 不再需要
-	// "strings" // 不再需要
-	// "sync"    // 不再需要
 	"time"
 
-	// "github.com/nats-io/nats.go" // Service 层不再直接依赖 NATS Conn
 	"google.golang.org/protobuf/proto"
 	// !!! 替换模块路径 !!!
 	aggregationv1 "go-xlive/gen/go/aggregation/v1"
@@ -18,23 +14,23 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	otelCodes "go.opentelemetry.io/otel/codes"
-	"go.opentelemetry.io/otel/trace" // 导入 trace 用于明确创建 Span
+	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-// AggregationService 结构体 (移除 NATS 相关字段)
+// AggregationService 结构体
 type AggregationService struct {
 	aggregationv1.UnimplementedAggregationServiceServer
 	logger        *zap.Logger
-	eventClient   eventv1.EventServiceClient     // 事件服务客户端
-	sessionClient sessionv1.SessionServiceClient // 场次服务客户端
-	tracer        trace.Tracer                   // 添加 Tracer
+	eventClient   eventv1.EventServiceClient
+	sessionClient sessionv1.SessionServiceClient
+	tracer        trace.Tracer
 }
 
-// NewAggregationService 创建实例 (移除 NATS Conn 参数)
+// NewAggregationService 创建实例
 func NewAggregationService(logger *zap.Logger, eventClient eventv1.EventServiceClient, sessionClient sessionv1.SessionServiceClient) *AggregationService {
 	if logger == nil {
 		log.Fatal("AggregationService 需要 Logger")
@@ -74,43 +70,75 @@ func (s *AggregationService) ProcessAggregation(ctx context.Context, sessionID s
 		s.logger.Error("查询事件失败", zap.String("session_id", sessionID), zap.Error(err))
 		span.RecordError(err)
 		span.SetStatus(otelCodes.Error, "Failed to query events")
-		st, _ := status.FromError(err)
+		// 返回更具体的错误信息给调用者
+		st, _ := status.FromError(err) // 尝试获取 gRPC 状态
 		if st.Code() == codes.DeadlineExceeded {
 			return nil, fmt.Errorf("查询事件超时: %w", err)
 		}
 		return nil, fmt.Errorf("查询事件失败: %w", err)
 	}
-	eventCount := len(eventResp.GetEvents())
+	events := eventResp.GetEvents() // 获取事件列表
+	eventCount := len(events)
 	s.logger.Info("查询到事件数量", zap.String("session_id", sessionID), zap.Int("count", eventCount))
 	span.SetAttributes(attribute.Int("events.queried_count", eventCount))
 
-	// 3. 执行聚合计算
+	// 3. 执行聚合计算 (完善)
 	totalEvents := int64(eventCount)
 	var totalDanmaku int64 = 0
 	var totalGiftsValue int64 = 0
-	for _, ev := range eventResp.GetEvents() {
+	userSet := make(map[string]bool) // 用于统计 UV (Unique Viewers)
+	var peakConnections int64 = 0    // 峰值连接估算
+
+	for _, ev := range events {
+		// 统计 UV (基于事件中的 UserID)
+		if ev.UserId != "" {
+			userSet[ev.UserId] = true
+		}
+
 		switch ev.EventType {
 		case eventv1.EventType_EVENT_TYPE_CHAT_MESSAGE:
 			totalDanmaku++
+			// 可以反序列化 ev.Data 获取 ChatMessage 内容进行更复杂的统计
 		case eventv1.EventType_EVENT_TYPE_GIFT:
 			var giftEvent eventv1.GiftSent
 			if err := proto.Unmarshal(ev.Data, &giftEvent); err == nil {
 				totalGiftsValue += giftEvent.GetCost() * int64(giftEvent.GetQuantity())
+				// 可以按 gift_id 进一步统计？
 			} else {
-				s.logger.Warn("无法解析 GiftSent 事件数据进行聚合", zap.String("event_id", ev.GetEventId()), zap.Error(err))
+				s.logger.Warn("聚合时无法解析 GiftSent 事件数据", zap.String("event_id", ev.GetEventId()), zap.Error(err))
 				span.AddEvent("Unmarshal GiftSent Error", trace.WithAttributes(attribute.String("event.id", ev.GetEventId())))
 			}
+		case eventv1.EventType_EVENT_TYPE_USER_PRESENCE:
+			var presenceEvent eventv1.UserPresence
+			if err := proto.Unmarshal(ev.Data, &presenceEvent); err == nil {
+				// 使用事件中记录的当前在线人数来估算峰值
+				// 注意：这依赖于 UserPresence 事件准确记录了当时的在线数
+				if presenceEvent.GetCurrentOnlineCount() > peakConnections {
+					peakConnections = presenceEvent.GetCurrentOnlineCount()
+				}
+			} else {
+				s.logger.Warn("聚合时无法解析 UserPresence 事件数据", zap.String("event_id", ev.GetEventId()), zap.Error(err))
+				span.AddEvent("Unmarshal UserPresence Error", trace.WithAttributes(attribute.String("event.id", ev.GetEventId())))
+			}
+			// 可以添加对其他事件类型的聚合逻辑
 		}
 	}
+	totalUniqueViewers := int64(len(userSet)) // UV 结果
+
 	s.logger.Info("聚合计算完成",
 		zap.String("session_id", sessionID),
 		zap.Int64("total_events", totalEvents),
 		zap.Int64("total_danmaku", totalDanmaku),
-		zap.Int64("total_gifts_value", totalGiftsValue))
+		zap.Int64("total_gifts_value", totalGiftsValue),
+		zap.Int64("total_uv_approx", totalUniqueViewers),      // 标记为近似值
+		zap.Int64("peak_connections_approx", peakConnections), // 标记为近似值
+	)
 	span.SetAttributes(
 		attribute.Int64("aggregation.total_events", totalEvents),
 		attribute.Int64("aggregation.total_danmaku", totalDanmaku),
 		attribute.Int64("aggregation.total_gifts_value", totalGiftsValue),
+		attribute.Int64("aggregation.uv_approx", totalUniqueViewers),
+		attribute.Int64("aggregation.pcu_approx", peakConnections),
 	)
 
 	// 4. 调用 SessionService 更新聚合结果
@@ -122,6 +150,7 @@ func (s *AggregationService) ProcessAggregation(ctx context.Context, sessionID s
 		TotalEvents:     totalEvents,
 		TotalDanmaku:    totalDanmaku,
 		TotalGiftsValue: totalGiftsValue,
+		// TODO: 传递 UV, PCU (需要在 Session proto 和 DB 中添加对应字段)
 	}
 	updateResp, err := s.sessionClient.UpdateSessionAggregates(updateCtx, updateReq)
 	if err != nil {
@@ -129,9 +158,9 @@ func (s *AggregationService) ProcessAggregation(ctx context.Context, sessionID s
 		span.RecordError(err)
 		span.SetStatus(otelCodes.Error, "Failed to update session aggregates")
 		st, _ := status.FromError(err)
-		// 检查是否因为 Session 不存在而更新失败 (SessionService 返回 NotFound)
+		// 检查是否因为 Session 不存在而更新失败
 		if st.Code() == codes.NotFound {
-			return nil, fmt.Errorf("更新聚合结果失败：未找到场次 %s: %w", sessionID, err)
+			return nil, fmt.Errorf("更新聚合失败: 未找到场次 %s: %w", sessionID, err)
 		} else if st.Code() == codes.DeadlineExceeded {
 			return nil, fmt.Errorf("更新场次聚合结果超时: %w", err)
 		}
@@ -160,7 +189,7 @@ func (s *AggregationService) TriggerAggregation(ctx context.Context, req *aggreg
 	if err != nil {
 		s.logger.Error("手动触发聚合处理失败", zap.String("session_id", req.GetSessionId()), zap.Error(err))
 		// Span 状态已在 ProcessAggregation 中设置
-		return nil, status.Errorf(codes.Internal, "处理聚合失败: %v", err)
+		return nil, status.Errorf(codes.Internal, "处理聚合失败: %v", err) // 返回内部错误给客户端
 	}
 
 	s.logger.Info("手动触发聚合处理成功", zap.String("session_id", req.GetSessionId()))
@@ -197,7 +226,7 @@ func (s *AggregationService) HealthCheck(ctx context.Context, req *emptypb.Empty
 		}
 	}
 
-	// Aggregation Service 不直接依赖 NATS 或 DB 进行核心逻辑
+	// Aggregation Service 本身不直接依赖 NATS Conn 或 DB 进行核心业务
 
 	if firstError != nil {
 		return &aggregationv1.HealthCheckResponse{Status: healthStatus}, nil
@@ -205,4 +234,4 @@ func (s *AggregationService) HealthCheck(ctx context.Context, req *emptypb.Empty
 	return &aggregationv1.HealthCheckResponse{Status: healthStatus}, nil
 }
 
-// --- 移除 StartNatsSubscription 和 StopNatsSubscription ---
+// --- 移除 StartNatsSubscrip	tion 和 StopNatsSubscription ---
