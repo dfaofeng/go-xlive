@@ -20,3 +20,8 @@ sql:
     queries: "internal/session/repository/query.sql" # 已添加 Update Aggregates
     schema: "internal/session/repository/schema.sql"   # 已添加聚合字段
     gen: {go: {package: "db", out: "internal/session/repository/db", sql_package: "pgx/v5", emit_json_tags: true, emit_interface: false, emit_exact_table_names: false, emit_empty_slices: true}}
+  # Aggregation Service Queries (新增)
+  - engine: "postgresql"
+    queries: "internal/aggregation/repository/query.sql"
+    schema: "internal/aggregation/repository/schema.sql"
+    gen: {go: {package: "db", out: "internal/aggregation/repository/db", sql_package: "pgx/v5", emit_json_tags: true, emit_interface: false, emit_exact_table_names: false, emit_empty_slices: true}}

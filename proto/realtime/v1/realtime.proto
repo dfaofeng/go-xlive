@@ -1,14 +1,91 @@
 syntax = "proto3";
+
 package realtime.v1;
+
 import "google/protobuf/empty.proto";
 import "google/api/annotations.proto";
 import "event/v1/event.proto"; // 导入事件类型
+import "protoc-gen-openapiv2/options/annotations.proto"; // 添加 OpenAPI import
+
 // !!! 替换模块路径 !!!
 option go_package = "go-xlive/gen/go/realtime/v1;realtimev1";
+
+// RealtimeService 提供实时事件订阅功能
 service RealtimeService {
-  rpc SubscribeSessionEvents(SubscribeSessionEventsRequest) returns (stream SessionEvent); // 服务器流
-  rpc HealthCheck(google.protobuf.Empty) returns (HealthCheckResponse) {option (google.api.http) = {get: "/v1/realtime/healthz"};}
+  // SubscribeSessionEvents 订阅指定会话的实时事件流
+  rpc SubscribeSessionEvents(SubscribeSessionEventsRequest) returns (stream SessionEvent) {
+    option (google.api.http) = {
+      get: "/v1/realtime/subscribe/{session_id}" // 使用 GET 和路径参数
+    };
+     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "订阅会话事件"
+      description: "通过 WebSocket 或服务器流订阅指定会话的实时事件"
+      // 移除 parameters，让生成器自动从路径模板中提取
+    };
+  }
+
+  // HealthCheck 检查服务健康状态
+  rpc HealthCheck(google.protobuf.Empty) returns (HealthCheckResponse) {
+    option (google.api.http) = {
+      get: "/v1/realtime/healthz"
+    };
+     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "健康检查"
+      description: "检查 Realtime 服务的健康状态"
+    };
+  }
 }
-message SubscribeSessionEventsRequest {string session_id = 1;}
-message SessionEvent {oneof event {event.v1.UserPresence user_presence = 1; event.v1.ChatMessage chat_message = 2; event.v1.GiftSent gift_sent = 3;}}
-message HealthCheckResponse {string status = 1;}
+
+// 订阅请求
+message SubscribeSessionEventsRequest {
+  string session_id = 1; // 要订阅的会话 ID
+}
+
+// 会话事件 (包含所有可能推送的事件类型)
+message SessionEvent {
+  oneof event {
+    event.v1.UserPresence user_presence = 1;
+    event.v1.ChatMessage chat_message = 2;
+    event.v1.StreamStatus stream_status = 3;         // 添加 StreamStatus
+    event.v1.GiftSent gift_sent = 4;                 // 取消注释并更新编号
+    event.v1.GuardPurchase guard_purchase = 5;       // 添加 GuardPurchase
+    event.v1.SuperChatMessage super_chat_message = 6; // 添加 SuperChatMessage
+    event.v1.WatchedCountUpdate watched_count_update = 7; // 添加 WatchedCountUpdate
+    event.v1.LikeCountUpdate like_count_update = 8;       // 添加 LikeCountUpdate
+    event.v1.OnlineRankUpdate online_rank_update = 9;   // 添加 OnlineRankUpdate
+    event.v1.UserInteraction user_interaction = 10;     // 添加 UserInteraction
+  }
+}
+
+// 健康检查响应
+message HealthCheckResponse {
+  string status = 1; // 例如 "OK"
+}
+
+// --- OpenAPI v2 Options ---
+option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
+  info: {
+    title: "Realtime Service API";
+    version: "1.0";
+    contact: {
+      name: "go-xlive project";
+      url: "https://github.com/your_org/go-xlive"; // 替换为你的项目地址
+    };
+  };
+  schemes: HTTP;
+  schemes: HTTPS;
+  consumes: "application/json";
+  produces: "application/json";
+   responses: {
+		key: "404";
+		value: {
+			description: "Resource not found.";
+		}
+	}
+  responses: {
+		key: "500";
+		value: {
+			description: "Internal server error.";
+		}
+	}
+};

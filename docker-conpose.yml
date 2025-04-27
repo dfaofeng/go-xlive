@@ -33,5 +33,22 @@ services:
       - "125:4222"             # NATS 客户端端口
       # - "8222:8222"           # NATS 监控端口 (可选)
 
+  # --- Bilibili Adapter Service (WebSocket based) ---
+  adapter-bilibili-service:
+    build:
+      context: .
+      # Dockerfile 可能需要调整以构建 adapter-bilibili-service 二进制文件
+    container_name: adapter-bilibili-service
+    # --- 移除端口映射 ---
+    # ports:
+    #   - "8081:8081"
+    depends_on:
+      - nats
+    volumes:
+      - ./configs:/app/configs
+    # --- 启动命令不再需要 -http_port ---
+    command: ["/app/adapter-bilibili-service", "-config=/app/configs"]
+    restart: unless-stopped
+
 volumes:
   postgres_data:                # 定义数据卷

@@ -1,0 +1,21 @@
+# Nacos 连接和本服务注册信息
+nacos:
+  server_addrs: ["fnos:8848"] # Nacos 服务器地址
+  namespace_id: "public"          # Nacos 命名空间
+  group_name: "DEFAULT_GROUP"     # 服务注册和发现的默认 Group
+  log_level: "warn"               # SDK 日志级别
+
+service:
+  name: "my-api-gateway"          # 本服务的注册名
+  port: 8080                      # 本服务监听的端口
+  # ip: ""                        # 留空则自动检测
+  metadata:
+    version: "1.0.0"
+    env: "dev"
+
+# 应用业务配置在 Nacos 中的位置
+app_config_data_id: "api-gateway.yaml" # 应用主配置的 Data ID
+app_config_group: "DEFAULT_GROUP"      # 应用主配置的 Group (可以和上面 group_name 不同)
+
+# 其他非 Nacos 管理的应用层配置 (如果需要)
+log_level: "debug"

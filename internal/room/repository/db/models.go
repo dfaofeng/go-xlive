@@ -9,9 +9,14 @@ import (
 )
 
 type Room struct {
-	RoomID      string             `json:"room_id"`
-	RoomName    string             `json:"room_name"`
-	OwnerUserID string             `json:"owner_user_id"`
-	Status      string             `json:"status"`
-	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	RoomID         string             `json:"room_id"`
+	RoomName       string             `json:"room_name"`
+	OwnerUserID    string             `json:"owner_user_id"`
+	Status         string             `json:"status"`
+	Platform       string             `json:"platform"`
+	PlatformRoomID string             `json:"platform_room_id"`
+	AreaName       pgtype.Text        `json:"area_name"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	AnchorName     pgtype.Text        `json:"anchor_name"`
+	DeletedAt      pgtype.Timestamptz `json:"deleted_at"`
 }

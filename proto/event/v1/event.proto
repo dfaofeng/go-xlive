@@ -3,37 +3,277 @@ syntax = "proto3";
 package event.v1;
 
 import "google/protobuf/timestamp.proto";
-import "google/protobuf/empty.proto";
 import "google/api/annotations.proto";
+import "protoc-gen-openapiv2/options/annotations.proto";
 
-// !!! 替换模块路径 !!!
 option go_package = "go-xlive/gen/go/event/v1;eventv1";
 
-// 事件处理与存储服务
+// EventService 用于处理和存储直播事件
 service EventService {
-  // 查询指定场次的事件
-  rpc QueryEvents(QueryEventsRequest) returns (QueryEventsResponse) {
+  // RecordEvent 记录一个通用事件
+  rpc RecordEvent (RecordEventRequest) returns (RecordEventResponse) {
     option (google.api.http) = {
-      post: "/v1/events:query" // 使用 POST 查询更灵活
+      post: "/v1/events/record"
       body: "*"
     };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "记录直播事件" // Changed summary to be more specific
+      description: "接收并存储各种类型的直播事件，如聊天消息、礼物、用户状态等。"
+    };
   }
-  // 健康检查
-  rpc HealthCheck(google.protobuf.Empty) returns (HealthCheckResponse) {
+
+  // GetAllSessionEvents 获取指定会话的所有事件
+  rpc GetAllSessionEvents (GetAllSessionEventsRequest) returns (GetAllSessionEventsResponse) {
     option (google.api.http) = {
-      get: "/v1/events/healthz"
+      get: "/v1/session/{session_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "获取会话事件"
+      description: "获取指定会话的所有事件，按时间顺序返回。"
     };
   }
 }
 
-enum EventType { EVENT_TYPE_UNSPECIFIED = 0; EVENT_TYPE_USER_PRESENCE = 1; EVENT_TYPE_CHAT_MESSAGE = 2; EVENT_TYPE_GIFT = 3; EVENT_TYPE_ROOM_STATUS = 4; }
-message StoredEvent { string event_id = 1; string session_id = 2; string room_id = 10; /* 新增关联房间 */ EventType event_type = 3; google.protobuf.Timestamp timestamp = 4; string user_id = 5; bytes data = 6; } // 假设 event_id 现在是 string (UUID string)
-message QueryEventsRequest { string session_id = 1; google.protobuf.Timestamp start_time = 2; google.protobuf.Timestamp end_time = 3; EventType event_type = 4; int32 limit = 5; int32 offset = 6; }
-message QueryEventsResponse { repeated StoredEvent events = 1; int32 total_count = 2; }
-message HealthCheckResponse { string status = 1; }
-// --- 具体事件类型定义 ---
-message RoomStatusChanged { string room_id = 1; string new_status = 2; google.protobuf.Timestamp timestamp = 3; }
-message SessionEnded { string session_id = 1; string room_id = 2; google.protobuf.Timestamp end_time = 3; }
-message UserPresence { string session_id = 1; string user_id = 2; bool entered = 3; int64 current_online_count = 4; google.protobuf.Timestamp timestamp = 5; }
-message ChatMessage { string message_id = 1; string session_id = 2; string user_id = 3; string content = 4; google.protobuf.Timestamp timestamp = 5; }
-message GiftSent { string gift_event_id = 1; string session_id = 2; string from_user_id = 3; string to_user_id = 4; string gift_id = 5; int32 quantity = 6; int64 cost = 7; google.protobuf.Timestamp timestamp = 8; }
+// 通用事件记录请求
+message RecordEventRequest {
+  string event_type = 1; // 事件类型 (可选，主要由 payload 决定)
+  oneof event_payload {
+    ChatMessage chat_message = 2;
+    UserPresence user_presence = 3;
+    StreamStatus stream_status = 4;
+    GiftSent gift_sent = 5;                 // 新增：礼物赠送
+    GuardPurchase guard_purchase = 6;       // 新增：大航海购买
+    SuperChatMessage super_chat_message = 7; // 新增：醒目留言
+    WatchedCountUpdate watched_count_update = 8; // 新增：观看人数更新
+    LikeCountUpdate like_count_update = 9;       // 新增：点赞数更新
+    OnlineRankUpdate online_rank_update = 10;   // 新增：高能榜更新
+    UserInteraction user_interaction = 11;     // 新增：用户互动 (关注/分享)
+    PlatformRoomInfoUpdated platform_room_info_updated = 12; // 新增: 平台房间信息更新
+  }
+}
+
+// 通用事件记录响应
+message RecordEventResponse {
+  bool success = 1;
+  string event_id = 2;
+  string error_message = 3;
+}
+
+// 聊天消息事件
+message ChatMessage {
+  string message_id = 1; // 消息的唯一 ID
+  string session_id = 2; // 消息所属的直播场次 ID (如果 is_during_live_session 为 false，则可能为空)
+  string room_id = 3; // 消息所属的房间 ID
+  string user_id = 4; // 发送消息的用户 ID
+  int32 user_level = 9;//用户等级
+  string username = 10; // 发送消息的用户名 (Standardized)
+  bool admin = 8;//是否为管理员
+  bool mobile_verify = 7;//是否绑定手机
+  int32 guard_level = 11;//大航海等级
+  string content = 5; // 消息内容
+  Medal medal = 12;
+  google.protobuf.Timestamp timestamp = 6; // 消息发送时间
+  string raw_msg = 13; // 原始消息
+  bool is_during_live_session = 14; // 标识事件是否发生在已知的活跃会话期间
+}
+//勋章
+message Medal {
+  string medal_upname = 1; // 勋章上主播昵称
+  string medal_name = 2; // 勋章名称
+  int32 medal_level = 3; // 勋章等级
+  int32 medal_color = 4; // 勋章颜色
+  int32 medal_uproomid = 5; // 勋章上主播房间id
+  int32 medal_upuid = 6; // 勋章主播id
+}
+
+// 用户状态事件 (进入/离开)
+message UserPresence {
+  string session_id = 1; // 事件发生的直播场次 ID (如果 is_during_live_session 为 false，则可能为空)
+  string room_id = 2; // 事件发生的房间 ID
+  string user_id = 3; // 进入或离开的用户 ID
+  string username = 10; // 进入或离开的用户名 (Standardized)
+  bool entered = 4; // true 表示进入，false 表示离开
+  google.protobuf.Timestamp timestamp = 5; // 事件发生时间
+  bool is_during_live_session = 6; // 标识事件是否发生在已知的活跃会话期间
+}
+
+// 直播流状态事件 (开始/结束) - 这个事件本身定义了直播状态，不需要额外字段
+message StreamStatus {
+  string session_id = 1; // 事件发生的直播场次 ID
+  string room_id = 2; // 事件发生的房间 ID
+  bool is_live = 3; // true 表示直播开始，false 表示直播结束
+  google.protobuf.Timestamp timestamp = 4; // 事件发生时间
+}
+
+// 礼物赠送事件
+message GiftSent {
+  string event_id = 1;   // 事件唯一 ID (例如 B站的 tid 或 combo_id)
+  string session_id = 2; // 事件发生的直播场次 ID (如果 is_during_live_session 为 false，则可能为空)
+  string room_id = 3; // 事件发生的房间 ID
+  string user_id = 4;    // 送礼用户 ID
+  string username = 5;  // 送礼用户名 (Standardized)
+  string gift_id = 6;    // 礼物 ID
+  string gift_name = 7;  // 礼物名称
+  int32 gift_count = 8;  // 礼物数量
+  int64 total_coin = 9;  // 礼物总价值 (平台货币，如金/银瓜子)
+  string coin_type = 11; // 平台货币类型 (例如 "gold", "silver")
+  google.protobuf.Timestamp timestamp = 10; // 事件发生时间
+  bool is_during_live_session = 12; // 标识事件是否发生在已知的活跃会话期间
+}
+
+// 大航海购买事件 (上舰/提督/总督)
+message GuardPurchase {
+  string event_id = 1;   // 事件唯一 ID (可以使用 B站的 payflow_id 或组合生成)
+  string session_id = 2; // 事件发生的直播场次 ID (如果 is_during_live_session 为 false，则可能为空)
+  string room_id = 3; // 事件发生的房间 ID
+  string user_id = 4;    // 购买用户 ID
+  string username = 5;  // 购买用户名 (Standardized)
+  int32 guard_level = 6; // 大航海等级 (例如 B站: 1-总督, 2-提督, 3-舰长)
+  string guard_name = 7; // 等级名称 (例如 "总督", "提督", "舰长")
+  int32 count = 8;       // 购买数量 (通常为 1)
+  int64 price = 9;       // 价格 (平台货币，如金瓜子)
+  google.protobuf.Timestamp timestamp = 10; // 事件发生时间
+  bool is_during_live_session = 11; // 标识事件是否发生在已知的活跃会话期间
+}
+
+// 醒目留言事件
+message SuperChatMessage {
+  string message_id = 1; // SC 消息 ID (例如 B站的 id 字段)
+  string session_id = 2; // 事件发生的直播场次 ID (如果 is_during_live_session 为 false，则可能为空)
+  string room_id = 3; // 事件发生的房间 ID
+  string user_id = 4;    // 发送用户 ID
+  string username = 5;  // 发送用户名 (Standardized)
+  string content = 6;    // SC 内容
+  int64 price = 7;       // SC 金额 (通常为法币，如 CNY)
+  int32 duration = 8;    // SC 持续时间 (秒)
+  google.protobuf.Timestamp timestamp = 9; // 事件发生时间
+  bool is_during_live_session = 10; // 标识事件是否发生在已知的活跃会话期间
+}
+
+// 观看人数更新事件
+message WatchedCountUpdate {
+  string session_id = 1; // 事件发生的直播场次 ID (如果 is_during_live_session 为 false，则可能为空)
+  string room_id = 2; // 事件发生的房间 ID
+  int64 count = 3;       // 当前累计观看人数
+  string text_large = 4; // (可选) 平台提供的显示文本 (例如 "1.7万人看过")
+  google.protobuf.Timestamp timestamp = 5; // 事件发生时间
+  bool is_during_live_session = 6; // 标识事件是否发生在已知的活跃会话期间
+}
+
+// 点赞数更新事件
+message LikeCountUpdate {
+  string session_id = 1; // 事件发生的直播场次 ID (如果 is_during_live_session 为 false，则可能为空)
+  string room_id = 2; // 事件发生的房间 ID
+  int64 count = 3;       // 当前累计点赞数
+  google.protobuf.Timestamp timestamp = 4; // 事件发生时间
+  bool is_during_live_session = 5; // 标识事件是否发生在已知的活跃会话期间
+}
+//在线观众
+message OnlineRankCount{
+  int64 count = 1;
+}
+// 高能榜更新事件 (简化版，只记录 Top N)
+message OnlineRankUpdate {
+  message RankUser {
+    string user_id = 1; // 上榜用户 ID
+    string username = 2; // 上榜用户名 (Standardized)
+    int32 rank = 3; // 排名
+    string score = 4; // 贡献值/分数 (字符串类型以兼容不同平台)
+    string face_url = 5; // (可选) 用户头像 URL
+  }
+  string session_id = 1; // 事件发生的直播场次 ID (如果 is_during_live_session 为 false，则可能为空)
+  string room_id = 2; // 事件发生的房间 ID
+  repeated RankUser top_users = 3; // 高能榜 Top N 用户列表
+  int64 total_count = 4; // (可选) 高能榜总人数 (如果平台提供)
+  google.protobuf.Timestamp timestamp = 5; // 事件发生时间
+  bool is_during_live_session = 6; // 标识事件是否发生在已知的活跃会话期间
+}
+
+// 用户互动事件 (关注/分享)
+message UserInteraction {
+  enum InteractionType {
+    UNKNOWN = 0; // 未知互动
+    FOLLOW = 1;  // 关注主播
+    SHARE = 2;   // 分享直播间
+  }
+  string event_id = 1; // 事件唯一 ID
+  string session_id = 2; // 事件发生的直播场次 ID (如果 is_during_live_session 为 false，则可能为空)
+  string room_id = 3; // 事件发生的房间 ID
+  string user_id = 4;    // 互动用户 ID
+  string username = 5;  // 互动用户名 (Standardized)
+  InteractionType type = 6; // 互动类型
+  google.protobuf.Timestamp timestamp = 7; // 事件发生时间
+  bool is_during_live_session = 8; // 标识事件是否发生在已知的活跃会话期间
+}
+
+// 新增: 平台房间信息更新事件 (由 Adapter 发布) - 这个事件本身定义了直播状态，不需要额外字段
+message PlatformRoomInfoUpdated {
+  string room_id = 1; // 我们系统内部的 Room ID
+  string platform = 2; // 平台名称 (例如 "bilibili")
+  string platform_room_id = 3; // 平台原始房间 ID
+  string room_name = 4; // 从平台获取的最新房间标题 (Standardized)
+  string area_name = 5; // 从平台获取的最新分区名称
+  google.protobuf.Timestamp timestamp = 6; // 事件发生时间
+  int32 live_status = 7; // 从平台获取的直播状态 (例如 Bilibili: 0=未开播, 1=直播中, 2=轮播中)
+}
+
+// 获取会话事件请求
+message GetAllSessionEventsRequest {
+  string session_id = 1;
+  google.protobuf.Timestamp timestamp = 2; // 事件发生时间
+  bool is_during_live_session = 3; // 标识事件是否发生在已知的活跃会话期间
+}
+
+// 获取会话事件响应
+message GetAllSessionEventsResponse {
+  // 直接返回各类事件数组
+  repeated ChatMessage chat_messages = 1;
+  repeated GiftSent gift_sents = 2;
+  repeated UserPresence user_presences = 3;
+  repeated StreamStatus stream_statuses = 4;
+  repeated LikeCountUpdate like_count_updates = 5;
+  repeated UserInteraction user_interactions = 6;
+  repeated PlatformRoomInfoUpdated platform_room_info_updateds = 7;
+  repeated OnlineRankUpdate online_rank_updates = 8;
+  repeated WatchedCountUpdate watched_count_updates = 9;
+  repeated SuperChatMessage super_chat_messages = 10;
+  repeated GuardPurchase guard_purchases = 11;
+}
+
+// 在线排名人数更新事件 (来自 ONLINE_RANK_COUNT cmd)
+message OnlineRankCountUpdatedEvent {
+  string session_id = 1; // 事件发生的直播场次 ID (如果 is_during_live_session 为 false，则可能为空)
+  string room_id = 2;    // 事件发生的房间 ID
+  int64 count = 3;       // 当前在线排名人数
+  google.protobuf.Timestamp timestamp = 4; // 事件发生时间
+  bool is_during_live_session = 5; // 标识事件是否发生在已知的活跃会话期间
+}
+
+
+// --- OpenAPI v2 Options ---
+option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
+  info: {
+    title: "Event Service API";
+    version: "1.0";
+    contact: {
+      name: "go-xlive project";
+      url: "https://github.com/your_org/go-xlive"; // 替换为你的项目地址
+    };
+  };
+  schemes: HTTP;
+  schemes: HTTPS;
+  consumes: "application/json";
+  produces: "application/json";
+  responses: {
+		key: "404";
+		value: {
+			description: "Resource not found.";
+		}
+	}
+  responses: {
+		key: "500";
+		value: {
+			description: "Internal server error.";
+		}
+	}
+};

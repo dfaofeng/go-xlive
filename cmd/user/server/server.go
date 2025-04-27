@@ -5,14 +5,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
-	"net/http"
-	// !!! 替换模块路径 !!!
 	userv1 "go-xlive/gen/go/user/v1"
 	"go-xlive/pkg/observability"
+	"net"
+	"net/http"
 
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
-	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health"
@@ -48,19 +46,38 @@ func NewGrpcServer(logger *zap.Logger, port int, userSvc userv1.UserServiceServe
 		return nil, fmt.Errorf("监听 gRPC 端口 %d 失败: %w", port, err)
 	}
 
-	otelServerHandler := otelgrpc.NewServerHandler(
-		otelgrpc.WithTracerProvider(otel.GetTracerProvider()),
-		otelgrpc.WithPropagators(otel.GetTextMapPropagator()),
+	//otelServerHandler := otelgrpc.NewServerHandler(
+	//	otelgrpc.WithTracerProvider(otel.GetTracerProvider()),
+	//	otelgrpc.WithPropagators(otel.GetTextMapPropagator()),
+	//	otelgrpc.WithFilter(func(info *stats.RPCTagInfo) bool {
+	//		return info.FullMethodName == "/grpc.health.v1.Health/Check" ||
+	//			info.FullMethodName == "/grpc.health.v1.Health/Watch"
+	//	}),
+	//)
+	// 定义 OTel 拦截器选项，包括之前的 Filter
+	// 注意：现在 Filter 是作为 Interceptor 的一个选项传入
+	otelInterceptorOpts := []otelgrpc.Option{
+		// otelgrpc.WithTracerProvider(otel.GetTracerProvider()), // 通常会自动获取全局 Provider
+		// otelgrpc.WithPropagators(otel.GetTextMapPropagator()), // 通常会自动获取全局 Propagator
 		otelgrpc.WithFilter(func(info *stats.RPCTagInfo) bool {
+			// 过滤掉健康检查的追踪。返回 true 表示 *不* 追踪这个方法。
+			// 根据你的日志，被过滤掉的方法名是小写，所以这里也用小写比较保险
+			// 如果你的 gRPC 库或 OTel 库版本较高，可能需要用 info.FullMethod
+			// 请根据实际情况调整，可以通过打印 info.FullMethodName 来确认
 			return info.FullMethodName == "/grpc.health.v1.Health/Check" ||
 				info.FullMethodName == "/grpc.health.v1.Health/Watch"
 		}),
-	)
-
+	}
 	s := grpc.NewServer(
-		grpc.StatsHandler(otelServerHandler),
+		//grpc.StatsHandler(otelServerHandler), // StatsHandler 已被拦截器取代
 		grpc.ChainUnaryInterceptor(
-			observability.MetricsUnaryServerInterceptor(),
+			otelgrpc.UnaryServerInterceptor(otelInterceptorOpts...), // OTel Unary 拦截器
+			observability.MetricsUnaryServerInterceptor(),           // Metrics Unary 拦截器
+		),
+		grpc.ChainStreamInterceptor( // <-- 新增: 添加 Stream 拦截器链
+			otelgrpc.StreamServerInterceptor(otelInterceptorOpts...), // OTel Stream 拦截器
+			// 如果需要，也可以添加 Stream 的 Metrics 拦截器
+			// observability.MetricsStreamServerInterceptor(),
 		),
 	)
 

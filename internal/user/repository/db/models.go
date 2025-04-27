@@ -8,8 +8,15 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type SystemSetting struct {
+	SettingKey   string             `json:"setting_key"`
+	SettingValue string             `json:"setting_value"`
+	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
+}
+
 type User struct {
-	UserID    string             `json:"user_id"`
-	Username  string             `json:"username"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UserID        string             `json:"user_id"`
+	Username      string             `json:"username"`
+	FollowerCount int32              `json:"follower_count"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
 }

@@ -1,0 +1,259 @@
+# docker-compose.yml
+version: '3.8'
+
+networks:
+  go-xlive-net:
+    driver: bridge
+
+services:
+  # --- Dependencies ---
+  postgres:
+    image: postgres:15-alpine
+    container_name: postgres_db
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: liveroomdb
+    ports:
+      - "5432:5432" # Map standard port for external access if needed
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d liveroomdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - go-xlive-net
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis_cache
+    ports:
+      - "6379:6379" # Map standard port for external access if needed
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - go-xlive-net
+    restart: unless-stopped
+
+  nats:
+    image: nats:2.9-alpine
+    container_name: nats_broker
+    ports:
+      - "4222:4222" # NATS client port
+      # - "8222:8222" # NATS monitoring port (optional)
+    networks:
+      - go-xlive-net
+    restart: unless-stopped
+
+  # --- Go Services ---
+  user-service:
+    build:
+      context: .
+      dockerfile: cmd/user/Dockerfile
+    container_name: user-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=liveroomdb
+      # Add other necessary env vars (e.g., GRPC_PORT=50051)
+      - GRPC_PORT=50051
+    networks:
+      - go-xlive-net
+    restart: unless-stopped
+
+  room-service:
+    build:
+      context: .
+      dockerfile: cmd/room/Dockerfile
+    container_name: room-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      user-service:
+        condition: service_started # Or define a healthcheck for user-service
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=liveroomdb
+      - USER_SERVICE_ADDR=user-service:50051 # Address for gRPC client
+      # Add other necessary env vars (e.g., GRPC_PORT=50052)
+      - GRPC_PORT=50052
+    networks:
+      - go-xlive-net
+    restart: unless-stopped
+
+  session-service:
+    build:
+      context: .
+      dockerfile: cmd/session/Dockerfile
+    container_name: session-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_started # NATS doesn't have a built-in healthcheck in this image version
+      user-service:
+        condition: service_started
+      room-service:
+        condition: service_started
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=liveroomdb
+      - REDIS_ADDR=redis:6379
+      - NATS_URL=nats://nats:4222
+      - USER_SERVICE_ADDR=user-service:50051
+      - ROOM_SERVICE_ADDR=room-service:50052
+      # Add other necessary env vars (e.g., GRPC_PORT=50053)
+      - GRPC_PORT=50053
+    networks:
+      - go-xlive-net
+    restart: unless-stopped
+
+  event-service:
+    build:
+      context: .
+      dockerfile: cmd/event/Dockerfile
+    container_name: event-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_started
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=liveroomdb
+      - REDIS_ADDR=redis:6379
+      - NATS_URL=nats://nats:4222
+      # Add other necessary env vars (e.g., GRPC_PORT=50054)
+      - GRPC_PORT=50054
+    networks:
+      - go-xlive-net
+    restart: unless-stopped
+
+  realtime-service:
+    build:
+      context: .
+      dockerfile: cmd/realtime/Dockerfile
+    container_name: realtime-service
+    depends_on:
+      nats:
+        condition: service_started
+    environment:
+      - NATS_URL=nats://nats:4222
+      # Add other necessary env vars (e.g., GRPC_PORT=50055)
+      - GRPC_PORT=50055
+    networks:
+      - go-xlive-net
+    restart: unless-stopped
+
+  aggregation-service:
+    build:
+      context: .
+      dockerfile: cmd/aggregation/Dockerfile
+    container_name: aggregation-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_started
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=liveroomdb
+      - NATS_URL=nats://nats:4222
+      # Add other necessary env vars (e.g., GRPC_PORT=50056)
+      - GRPC_PORT=50056
+    networks:
+      - go-xlive-net
+    restart: unless-stopped
+
+  adapter-bilibili-service:
+    build:
+      context: .
+      dockerfile: cmd/adapter-bilibili/Dockerfile
+    container_name: adapter-bilibili-service
+    depends_on:
+      nats:
+        condition: service_started
+      session-service: # Depends on session service to get session ID
+        condition: service_started
+    environment:
+      - NATS_URL=nats://nats:4222
+      - SESSION_SERVICE_ADDR=session-service:50053 # Address for gRPC client
+      # Add other necessary env vars (e.g., BILIBILI_ROOM_ID)
+      # - BILIBILI_ROOM_ID=YOUR_ROOM_ID # Example: Needs to be configured
+    networks:
+      - go-xlive-net
+    restart: unless-stopped
+
+  adapter-service: # Generic adapter
+    build:
+      context: .
+      dockerfile: cmd/adapter/Dockerfile
+    container_name: adapter-service
+    depends_on:
+      nats:
+        condition: service_started
+    environment:
+      - NATS_URL=nats://nats:4222
+      # Add other necessary env vars (e.g., GRPC_PORT=50058)
+      - GRPC_PORT=50058
+    networks:
+      - go-xlive-net
+    restart: unless-stopped
+
+  gateway-service:
+    build:
+      context: .
+      dockerfile: cmd/gateway/Dockerfile
+    container_name: gateway-service
+    ports:
+      - "8080:8080" # Expose gateway port externally
+    depends_on:
+      # Depends on all backend gRPC services it needs to connect to
+      - user-service
+      - room-service
+      - session-service
+      - event-service
+      - realtime-service
+      - aggregation-service
+    environment:
+      - USER_SERVICE_ADDR=user-service:50051
+      - ROOM_SERVICE_ADDR=room-service:50052
+      - SESSION_SERVICE_ADDR=session-service:50053
+      - EVENT_SERVICE_ADDR=event-service:50054
+      - REALTIME_SERVICE_ADDR=realtime-service:50055
+      - AGGREGATION_SERVICE_ADDR=aggregation-service:50056
+      # Add other necessary env vars (e.g., HTTP_PORT=8080)
+      - HTTP_PORT=8080
+    networks:
+      - go-xlive-net
+    restart: unless-stopped
+
+volumes:
+  postgres_data: # Define the volume for PostgreSQL persistence

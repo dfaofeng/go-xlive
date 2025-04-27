@@ -5,25 +5,57 @@ package session.v1;
 import "google/api/annotations.proto";
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/empty.proto";
+import "protoc-gen-openapiv2/options/annotations.proto"; // <-- 添加导入
 
 // !!! 替换模块路径 !!!
 option go_package = "go-xlive/gen/go/session/v1;sessionv1";
 
 service SessionService {
+  // CreateSession is now triggered internally by platform events (e.g., LIVE)
   rpc CreateSession(CreateSessionRequest) returns (CreateSessionResponse) {
-    option (google.api.http) = { post: "/v1/sessions" body: "*" };
+    // option (google.api.http) = { post: "/v1/sessions" body: "*" }; // REMOVED
+    // option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = { // REMOVED
+    //   summary: "创建新直播场次" // REMOVED
+    // }; // REMOVED
   }
+  // EndSession is now triggered internally by platform events (e.g., PREPARING)
   rpc EndSession(EndSessionRequest) returns (EndSessionResponse) {
-    option (google.api.http) = { put: "/v1/sessions/{session_id}/end" body: "*" };
+    // option (google.api.http) = { put: "/v1/sessions/{session_id}/end" body: "*" }; // REMOVED
+    // option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = { // REMOVED
+    //   summary: "结束直播场次" // REMOVED
+    // }; // REMOVED
   }
   rpc GetSession(GetSessionRequest) returns (GetSessionResponse) {
     option (google.api.http) = { get: "/v1/sessions/{session_id}" };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "获取直播场次信息"
+    };
+  }
+  // 新增: 根据房间 ID 获取当前直播中的场次
+  rpc GetLiveSessionByRoomID(GetLiveSessionByRoomIDRequest) returns (GetLiveSessionByRoomIDResponse) {
+     option (google.api.http) = { get: "/v1/rooms/{room_id}/live_session" };
+     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+       summary: "获取房间当前直播场次"
+     };
   }
   // 更新场次聚合统计 (新增)
-  rpc UpdateSessionAggregates(UpdateSessionAggregatesRequest) returns (UpdateSessionAggregatesResponse);
+  rpc UpdateSessionAggregates(UpdateSessionAggregatesRequest) returns (UpdateSessionAggregatesResponse) {
+    // Note: This RPC might not be exposed via HTTP gateway, so no http option or summary needed for OpenAPI.
+  }
+  // 新增: 删除场次
+  rpc DeleteSession(DeleteSessionRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = { delete: "/v1/sessions/{session_id}" };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "删除直播场次"
+      description: "根据场次 ID 删除直播场次及其关联数据。注意：这是一个危险操作。"
+    };
+  }
   // 健康检查
   rpc HealthCheck(google.protobuf.Empty) returns (HealthCheckResponse) {
     option (google.api.http) = { get: "/v1/sessions/healthz" };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "服务健康检查"
+    };
   }
   // 发送弹幕消息 (新增)
   rpc SendChatMessage(SendChatMessageRequest) returns (SendChatMessageResponse) {
@@ -31,30 +63,129 @@ service SessionService {
       post: "/v1/sessions/{session_id}/chat"
       body: "*"
     };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "发送聊天消息"
+    };
+  }
+  // 检查指定内部房间 ID 当前是否有活跃会话 (修正)
+  rpc CheckSessionActive(CheckSessionActiveRequest) returns (CheckSessionActiveResponse) {
+    // 此 RPC 主要用于内部服务间调用，不暴露 HTTP 接口
+  }
+  // 新增: 获取会话列表
+  rpc ListSessions(ListSessionsRequest) returns (ListSessionsResponse) {
+    option (google.api.http) = {
+      get: "/v1/sessions"
+    };
+  }
+  // 新增: 获取会话详情
+  rpc GetSessionDetails(GetSessionRequest) returns (GetSessionResponse) {
+    option (google.api.http) = {
+      get: "/v1/sessions/{session_id}/details"
+    };
+  }
+  // 新增: 获取所有直播中场次的 ID
+  rpc ListLiveSessions(ListLiveSessionsRequest) returns (ListLiveSessionsResponse) {
+    // 此 RPC 主要用于内部服务间调用，不暴露 HTTP 接口
   }
 }
 
 message Session {
   string session_id = 1;
-  string room_id = 2;
+  string room_id = 2; // 内部 Room ID (UUID)
   google.protobuf.Timestamp start_time = 3;
   google.protobuf.Timestamp end_time = 4;
   string status = 5;
+  // 聚合统计
   int64 total_events = 6;
   int64 total_danmaku = 7;
   int64 total_gifts_value = 8;
+  int64 total_likes = 9;
+  int64 total_watched = 10;
+  string session_title = 11; // 场次标题 (新增)
+  string owner_user_id = 15; // 房主用户 ID (保留)
+  // --- 新增字段 ---
+  string room_title = 12;    // Bilibili 原始房间标题
+  string streamer_name = 13; // Bilibili 主播名称
 }
 
-message CreateSessionRequest { string room_id = 1; }
+message CreateSessionRequest {
+  string room_id = 1; // 要为其创建新直播场次的内部房间 ID
+  string session_title = 2; // 场次标题 (新增)
+  // --- 新增字段 ---
+  string room_title = 3;    // Bilibili 原始房间标题
+  string streamer_name = 4; // Bilibili 主播名称
+}
 message CreateSessionResponse { Session session = 1; }
-message EndSessionRequest { string session_id = 1; }
+message EndSessionRequest { string session_id = 1; // 要结束的直播场次的 ID
+}
 message EndSessionResponse { Session session = 1; }
-message GetSessionRequest { string session_id = 1; }
+message GetSessionRequest { string session_id = 1; // 要获取的直播场次的 ID
+}
 message GetSessionResponse { Session session = 1; }
-message UpdateSessionAggregatesRequest { string session_id = 1; int64 total_events = 2; int64 total_danmaku = 3; int64 total_gifts_value = 4; }
+
+// 新增: GetLiveSessionByRoomID 请求
+message GetLiveSessionByRoomIDRequest { string room_id = 1; // 要查询当前直播场次的内部房间 ID
+}
+// 新增: GetLiveSessionByRoomID 响应 (可能为空)
+message GetLiveSessionByRoomIDResponse { Session session = 1; } // 如果没有 live session，则返回空 session
+
+// --- 修正: 添加 total_likes 和 total_watched ---
+message UpdateSessionAggregatesRequest {
+  string session_id = 1; // 要更新统计数据的场次 ID
+  int64 total_events = 2; // (可选) 更新的总事件数
+  int64 total_danmaku = 3; // (可选) 更新的总弹幕数
+  int64 total_gifts_value = 4; // (可选) 更新的总礼物价值
+  int64 total_likes = 5; // (可选) 更新的总点赞数
+  int64 total_watched = 6; // (可选) 更新的总观看人数
+}
 message UpdateSessionAggregatesResponse { Session updated_session = 1; }
 // 发送弹幕请求 (新增)
-message SendChatMessageRequest { string session_id = 1; string user_id = 2; string content = 3; }
+message SendChatMessageRequest {
+  string session_id = 1; // 弹幕要发送到的场次 ID
+  string user_id = 2; // 发送弹幕的用户 ID (可以是匿名用户的标识)
+  string content = 3; // 弹幕内容
+}
 // 发送弹幕响应 (新增)
 message SendChatMessageResponse { string message_id = 1; bool success = 2; }
 message HealthCheckResponse { string status = 1; }
+
+// CheckSessionActive 请求 (修正)
+message CheckSessionActiveRequest {
+  string room_id = 1; // 内部 Room ID (UUID)
+}
+// CheckSessionActive 响应 (保持不变)
+message CheckSessionActiveResponse {
+  bool is_active = 1; // 会话是否活跃
+  string session_id = 2; // 如果活跃，返回活跃的 session_id (可选)
+}
+
+// 新增: DeleteSession 请求
+message DeleteSessionRequest {
+  string session_id = 1; // 要删除的直播场次的 ID
+}
+// DeleteSession 的响应使用 google.protobuf.Empty
+
+// 新增: ListSessions 请求
+message ListSessionsRequest {
+  int32 page = 1; // 页码，从 1 开始
+  int32 page_size = 2; // 每页数量
+  string status = 3; // 可选，按状态过滤
+  string room_id = 4; // 可选，按房间 ID 过滤
+  string owner_user_id = 5; // 可选，按房主用户 ID 过滤
+}
+
+// 新增: ListSessions 响应
+message ListSessionsResponse {
+  repeated Session sessions = 1; // 会话列表
+  int32 total = 2; // 总数
+  int32 page = 3; // 当前页码
+  int32 page_size = 4; // 每页数量
+}
+
+// 新增: ListLiveSessions 请求 (空)
+message ListLiveSessionsRequest {}
+
+// 新增: ListLiveSessions 响应
+message ListLiveSessionsResponse {
+  repeated string session_ids = 1; // 直播中场次的 ID 列表
+}

@@ -16,14 +16,15 @@
     "application/json"
   ],
   "paths": {
-    "/v1/sessions": {
-      "post": {
-        "operationId": "SessionService_CreateSession",
+    "/v1/rooms/{roomId}/live_session": {
+      "get": {
+        "summary": "获取房间当前直播场次",
+        "operationId": "SessionService_GetLiveSessionByRoomID",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/v1CreateSessionResponse"
+              "$ref": "#/definitions/v1GetLiveSessionByRoomIDResponse"
             }
           },
           "default": {
@@ -35,12 +36,73 @@
         },
         "parameters": [
           {
-            "name": "body",
-            "in": "body",
+            "name": "roomId",
+            "description": "要查询当前直播场次的内部房间 ID",
+            "in": "path",
             "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "SessionService"
+        ]
+      }
+    },
+    "/v1/sessions": {
+      "get": {
+        "summary": "新增: 获取会话列表",
+        "operationId": "SessionService_ListSessions",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/v1CreateSessionRequest"
+              "$ref": "#/definitions/v1ListSessionsResponse"
             }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "page",
+            "description": "页码，从 1 开始",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "pageSize",
+            "description": "每页数量",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "status",
+            "description": "可选，按状态过滤",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "roomId",
+            "description": "可选，按房间 ID 过滤",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "ownerUserId",
+            "description": "可选，按房主用户 ID 过滤",
+            "in": "query",
+            "required": false,
+            "type": "string"
           }
         ],
         "tags": [
@@ -50,7 +112,7 @@
     },
     "/v1/sessions/healthz": {
       "get": {
-        "summary": "健康检查",
+        "summary": "服务健康检查",
         "operationId": "SessionService_HealthCheck",
         "responses": {
           "200": {
@@ -73,6 +135,7 @@
     },
     "/v1/sessions/{sessionId}": {
       "get": {
+        "summary": "获取直播场次信息",
         "operationId": "SessionService_GetSession",
         "responses": {
           "200": {
@@ -91,6 +154,39 @@
         "parameters": [
           {
             "name": "sessionId",
+            "description": "要获取的直播场次的 ID",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "SessionService"
+        ]
+      },
+      "delete": {
+        "summary": "删除直播场次",
+        "description": "根据场次 ID 删除直播场次及其关联数据。注意：这是一个危险操作。",
+        "operationId": "SessionService_DeleteSession",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "sessionId",
+            "description": "要删除的直播场次的 ID",
             "in": "path",
             "required": true,
             "type": "string"
@@ -103,7 +199,7 @@
     },
     "/v1/sessions/{sessionId}/chat": {
       "post": {
-        "summary": "发送弹幕消息 (新增)",
+        "summary": "发送聊天消息",
         "operationId": "SessionService_SendChatMessage",
         "responses": {
           "200": {
@@ -122,6 +218,7 @@
         "parameters": [
           {
             "name": "sessionId",
+            "description": "弹幕要发送到的场次 ID",
             "in": "path",
             "required": true,
             "type": "string"
@@ -134,10 +231,12 @@
               "type": "object",
               "properties": {
                 "userId": {
-                  "type": "string"
+                  "type": "string",
+                  "title": "发送弹幕的用户 ID (可以是匿名用户的标识)"
                 },
                 "content": {
-                  "type": "string"
+                  "type": "string",
+                  "title": "弹幕内容"
                 }
               },
               "title": "发送弹幕请求 (新增)"
@@ -149,14 +248,15 @@
         ]
       }
     },
-    "/v1/sessions/{sessionId}/end": {
-      "put": {
-        "operationId": "SessionService_EndSession",
+    "/v1/sessions/{sessionId}/details": {
+      "get": {
+        "summary": "新增: 获取会话详情",
+        "operationId": "SessionService_GetSessionDetails",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/v1EndSessionResponse"
+              "$ref": "#/definitions/v1GetSessionResponse"
             }
           },
           "default": {
@@ -169,17 +269,10 @@
         "parameters": [
           {
             "name": "sessionId",
+            "description": "要获取的直播场次的 ID",
             "in": "path",
             "required": true,
             "type": "string"
-          },
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "type": "object"
-            }
           }
         ],
         "tags": [
@@ -193,10 +286,12 @@
       "type": "object",
       "properties": {
         "@type": {
-          "type": "string"
+          "type": "string",
+          "description": "A URL/resource name that uniquely identifies the type of the serialized\nprotocol buffer message. This string must contain at least\none \"/\" character. The last segment of the URL's path must represent\nthe fully qualified name of the type (as in\n`path/google.protobuf.Duration`). The name should be in a canonical form\n(e.g., leading \".\" is not accepted).\n\nIn practice, teams usually precompile into the binary all types that they\nexpect it to use in the context of Any. However, for URLs which use the\nscheme `http`, `https`, or no scheme, one can optionally set up a type\nserver that maps type URLs to message definitions as follows:\n\n* If no scheme is provided, `https` is assumed.\n* An HTTP GET on the URL must yield a [google.protobuf.Type][]\n  value in binary format, or produce an error.\n* Applications are allowed to cache lookup results based on the\n  URL, or have them precompiled into a binary to avoid any\n  lookup. Therefore, binary compatibility needs to be preserved\n  on changes to types. (Use versioned type names to manage\n  breaking changes.)\n\nNote: this functionality is not currently available in the official\nprotobuf release, and it is not used for type URLs beginning with\ntype.googleapis.com. As of May 2023, there are no widely used type server\nimplementations and no plans to implement one.\n\nSchemes other than `http`, `https` (or the empty scheme) might be\nused with implementation specific semantics."
         }
       },
-      "additionalProperties": {}
+      "additionalProperties": {},
+      "description": "`Any` contains an arbitrary serialized protocol buffer message along with a\nURL that describes the type of the serialized message.\n\nProtobuf library provides support to pack/unpack Any values in the form\nof utility functions or additional generated methods of the Any type.\n\nExample 1: Pack and unpack a message in C++.\n\n    Foo foo = ...;\n    Any any;\n    any.PackFrom(foo);\n    ...\n    if (any.UnpackTo(\u0026foo)) {\n      ...\n    }\n\nExample 2: Pack and unpack a message in Java.\n\n    Foo foo = ...;\n    Any any = Any.pack(foo);\n    ...\n    if (any.is(Foo.class)) {\n      foo = any.unpack(Foo.class);\n    }\n    // or ...\n    if (any.isSameTypeAs(Foo.getDefaultInstance())) {\n      foo = any.unpack(Foo.getDefaultInstance());\n    }\n\n Example 3: Pack and unpack a message in Python.\n\n    foo = Foo(...)\n    any = Any()\n    any.Pack(foo)\n    ...\n    if any.Is(Foo.DESCRIPTOR):\n      any.Unpack(foo)\n      ...\n\n Example 4: Pack and unpack a message in Go\n\n     foo := \u0026pb.Foo{...}\n     any, err := anypb.New(foo)\n     if err != nil {\n       ...\n     }\n     ...\n     foo := \u0026pb.Foo{}\n     if err := any.UnmarshalTo(foo); err != nil {\n       ...\n     }\n\nThe pack methods provided by protobuf library will by default use\n'type.googleapis.com/full.type.name' as the type URL and the unpack\nmethods only use the fully qualified type name after the last '/'\nin the type URL, for example \"foo.bar.com/x/y.z\" will yield type\nname \"y.z\".\n\nJSON\n====\nThe JSON representation of an `Any` value uses the regular\nrepresentation of the deserialized, embedded message, with an\nadditional field `@type` which contains the type URL. Example:\n\n    package google.profile;\n    message Person {\n      string first_name = 1;\n      string last_name = 2;\n    }\n\n    {\n      \"@type\": \"type.googleapis.com/google.profile.Person\",\n      \"firstName\": \u003cstring\u003e,\n      \"lastName\": \u003cstring\u003e\n    }\n\nIf the embedded message type is well-known and has a custom JSON\nrepresentation, that representation will be embedded adding a field\n`value` which holds the custom JSON in addition to the `@type`\nfield. Example (for message [google.protobuf.Duration][]):\n\n    {\n      \"@type\": \"type.googleapis.com/google.protobuf.Duration\",\n      \"value\": \"1.212s\"\n    }"
     },
     "rpcStatus": {
       "type": "object",
@@ -225,13 +320,19 @@
         }
       }
     },
-    "v1CreateSessionRequest": {
+    "v1CheckSessionActiveResponse": {
       "type": "object",
       "properties": {
-        "roomId": {
-          "type": "string"
+        "isActive": {
+          "type": "boolean",
+          "title": "会话是否活跃"
+        },
+        "sessionId": {
+          "type": "string",
+          "title": "如果活跃，返回活跃的 session_id (可选)"
         }
-      }
+      },
+      "title": "CheckSessionActive 响应 (保持不变)"
     },
     "v1CreateSessionResponse": {
       "type": "object",
@@ -249,6 +350,15 @@
         }
       }
     },
+    "v1GetLiveSessionByRoomIDResponse": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/definitions/v1Session"
+        }
+      },
+      "title": "新增: GetLiveSessionByRoomID 响应 (可能为空)"
+    },
     "v1GetSessionResponse": {
       "type": "object",
       "properties": {
@@ -256,6 +366,48 @@
           "$ref": "#/definitions/v1Session"
         }
       }
+    },
+    "v1ListLiveSessionsResponse": {
+      "type": "object",
+      "properties": {
+        "sessionIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "title": "直播中场次的 ID 列表"
+        }
+      },
+      "title": "新增: ListLiveSessions 响应"
+    },
+    "v1ListSessionsResponse": {
+      "type": "object",
+      "properties": {
+        "sessions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1Session"
+          },
+          "title": "会话列表"
+        },
+        "total": {
+          "type": "integer",
+          "format": "int32",
+          "title": "总数"
+        },
+        "page": {
+          "type": "integer",
+          "format": "int32",
+          "title": "当前页码"
+        },
+        "pageSize": {
+          "type": "integer",
+          "format": "int32",
+          "title": "每页数量"
+        }
+      },
+      "title": "新增: ListSessions 响应"
     },
     "v1SendChatMessageResponse": {
       "type": "object",
@@ -276,7 +428,8 @@
           "type": "string"
         },
         "roomId": {
-          "type": "string"
+          "type": "string",
+          "title": "内部 Room ID (UUID)"
         },
         "startTime": {
           "type": "string",
@@ -291,7 +444,8 @@
         },
         "totalEvents": {
           "type": "string",
-          "format": "int64"
+          "format": "int64",
+          "title": "聚合统计"
         },
         "totalDanmaku": {
           "type": "string",
@@ -300,6 +454,31 @@
         "totalGiftsValue": {
           "type": "string",
           "format": "int64"
+        },
+        "totalLikes": {
+          "type": "string",
+          "format": "int64"
+        },
+        "totalWatched": {
+          "type": "string",
+          "format": "int64"
+        },
+        "sessionTitle": {
+          "type": "string",
+          "title": "场次标题 (新增)"
+        },
+        "ownerUserId": {
+          "type": "string",
+          "title": "房主用户 ID (保留)"
+        },
+        "roomTitle": {
+          "type": "string",
+          "description": "Bilibili 原始房间标题",
+          "title": "--- 新增字段 ---"
+        },
+        "streamerName": {
+          "type": "string",
+          "title": "Bilibili 主播名称"
         }
       }
     },

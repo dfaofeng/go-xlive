@@ -28,7 +28,9 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type RealtimeServiceClient interface {
+	// SubscribeSessionEvents 订阅指定会话的实时事件流
 	SubscribeSessionEvents(ctx context.Context, in *SubscribeSessionEventsRequest, opts ...grpc.CallOption) (RealtimeService_SubscribeSessionEventsClient, error)
+	// HealthCheck 检查服务健康状态
 	HealthCheck(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*HealthCheckResponse, error)
 }
 
@@ -85,7 +87,9 @@ func (c *realtimeServiceClient) HealthCheck(ctx context.Context, in *emptypb.Emp
 // All implementations should embed UnimplementedRealtimeServiceServer
 // for forward compatibility
 type RealtimeServiceServer interface {
+	// SubscribeSessionEvents 订阅指定会话的实时事件流
 	SubscribeSessionEvents(*SubscribeSessionEventsRequest, RealtimeService_SubscribeSessionEventsServer) error
+	// HealthCheck 检查服务健康状态
 	HealthCheck(context.Context, *emptypb.Empty) (*HealthCheckResponse, error)
 }
 

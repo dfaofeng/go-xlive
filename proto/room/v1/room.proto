@@ -5,27 +5,161 @@ package room.v1;
 import "google/api/annotations.proto";
 import "user/v1/user.proto";
 import "google/protobuf/empty.proto";
+import "google/protobuf/field_mask.proto"; // 导入 FieldMask 用于部分更新
+import "google/protobuf/timestamp.proto";
+import "common/v1/response.proto";
+// 导入 Timestamp 用于事件
+import "protoc-gen-openapiv2/options/annotations.proto"; // <-- 添加导入
 
 // !!! 替换模块路径 !!!
 option go_package = "go-xlive/gen/go/room/v1;roomv1";
 
 service RoomService {
   rpc CreateRoom(CreateRoomRequest) returns (CreateRoomResponse) {
-    option (google.api.http) = { post: "/v1/rooms" body: "*" };
+    option (google.api.http) = {
+      post: "/v1/rooms"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "创建新房间"
+      description: "仅需提供平台、平台房间ID和所有者用户ID即可创建房间。" // 更新描述
+    };
   }
   rpc GetRoom(GetRoomRequest) returns (GetRoomResponse) {
     option (google.api.http) = { get: "/v1/rooms/{room_id}" };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "获取房间信息";
+      responses:{
+        key:"200";
+        value: {
+          description: "获取房间信息成功。"
+          schema: {
+            json_schema: {
+              ref: ".room.v1.Room";
+              description: "房间信息";
+              example: "{\"room_id\": \"123456\", \"room_name\": \"我的直播间\", \"owner_user_id\": \"987654321\", \"status\": \"active\", \"platform\": \"bilibili\", \"platform_room_id\": \"987654321\", \"area_name\": \"我的直播间\", \"anchor_name\": \"我的主播\"}"
+            }
+          }
+        }
+      }
+    };
+  }
+  // 新增: 更新房间信息 (部分更新)
+  rpc UpdateRoom(UpdateRoomRequest) returns (UpdateRoomResponse) {
+    option (google.api.http) = {
+      patch: "/v1/rooms/{room.room_id}" // 使用 PATCH
+      body: "room"
+      additional_bindings {
+        put: "/v1/rooms/{room.room_id}" // 也支持 PUT (完全替换)
+        body: "room"
+      }
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "更新房间信息"
+      description: "部分更新房间信息，目前支持更新 status 和 room_name 字段。"
+    };
+  }
+  // 新增: 列出房间列表
+  rpc ListRooms(ListRoomsRequest) returns (ListRoomsResponse) {
+    option (google.api.http) = { get: "/v1/rooms" };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "列出房间列表"
+      description: "支持按状态和平台过滤，并支持分页。"
+    };
+  }
+  // 新增: 根据平台 ID 获取房间
+  rpc GetRoomByPlatformID(GetRoomByPlatformIDRequest) returns (GetRoomResponse) {
+    option (google.api.http) = { get: "/v1/rooms:byPlatformId" }; // 使用自定义方法语法
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "根据平台 ID 获取房间"
+    };
+  }
+  // 新增: 删除房间
+  rpc DeleteRoom(DeleteRoomRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = { delete: "/v1/rooms/{room_id}" };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "删除房间"
+      description: "根据房间 ID 删除房间。注意：这通常是一个危险操作，请谨慎使用。"
+    };
   }
   // 健康检查 (新增)
   rpc HealthCheck(google.protobuf.Empty) returns (HealthCheckResponse) {
     option (google.api.http) = { get: "/v1/rooms/healthz" };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "服务健康检查"
+    };
   }
 }
 
-message Room { string room_id = 1; string room_name = 2; string owner_user_id = 3; string status = 4; }
-message CreateRoomRequest { string room_name = 1; string owner_user_id = 2; }
+message Room {
+  string room_id = 1;
+  string room_name = 2;
+  string owner_user_id = 3;
+  string status = 4;
+  string platform = 5;
+  string platform_room_id = 6;
+  string area_name = 7;
+  string anchor_name = 8; // 主播名称 (新增)
+  // 可以添加 updated_at 等字段
+}
+message CreateRoomRequest {
+  // string room_name = 1; // 移除 room_name，应由后端自动获取
+  string owner_user_id = 2; // 房间所有者的用户 ID
+  string platform = 3; // 房间所属的平台标识 (例如 "bilibili", "douyin")
+  string platform_room_id = 4; // 房间在对应平台上的原始 ID
+  // string area_name = 5; // 移除 area_name
+}
 message CreateRoomResponse { Room room = 1; }
-message GetRoomRequest { string room_id = 1; }
+message GetRoomRequest { string room_id = 1; // 要获取的房间的内部唯一 ID
+}
+// GetRoomResponse 保持不变，因为 GetRoomByPlatformID 也返回房间和房主信息
 message GetRoomResponse { Room room = 1; user.v1.User owner = 2; }
+
+// 新增: UpdateRoom 请求
+message UpdateRoomRequest {
+  Room room = 1; // 包含要更新的字段的 Room 对象 (room_id 必须提供)
+  google.protobuf.FieldMask update_mask = 2; // 指定要更新的字段路径 (例如 "status")。注意：area_name 不允许通过此接口更新。room_name 可以通过 update_mask 更新。
+}
+// 新增: UpdateRoom 响应
+message UpdateRoomResponse { Room room = 1; } // 返回更新后的 Room 对象
+
+// 新增: ListRooms 请求
+message ListRoomsRequest {
+  string status_filter = 1; // (可选) 按房间状态过滤 (例如 "active", "inactive")
+  string platform_filter = 2; // (可选) 按平台标识过滤 (例如 "bilibili")
+  int32 page_size = 3; // (可选) 每页返回的房间数量，默认为 20
+  int32 page_offset = 4; // (可选) 返回结果的偏移量，用于分页，默认为 0
+}
+// 新增: ListRooms 响应
+message ListRoomsResponse {
+  repeated Room rooms = 1; // 房间列表
+  // int64 total_size = 2; // (可选) 返回总记录数，如果需要前端显示页码
+}
+
+// 新增: GetRoomByPlatformID 请求
+message GetRoomByPlatformIDRequest {
+  string platform = 1; // 房间所属的平台标识
+  string platform_room_id = 2; // 房间在对应平台上的原始 ID
+}
+// GetRoomByPlatformID 的响应使用 GetRoomResponse
+
+// 新增: DeleteRoom 请求
+message DeleteRoomRequest {
+  string room_id = 1; // 要删除的房间的内部唯一 ID
+}
+// DeleteRoom 的响应使用 google.protobuf.Empty
+
 // 健康检查响应 (新增)
 message HealthCheckResponse { string status = 1; }
+
+// --- 事件定义 ---
+
+// RoomUpdatedEvent 定义房间更新事件结构
+message RoomUpdatedEvent {
+  string room_id = 1;
+  // 包含关键的可更新字段
+  string room_name = 2;
+  string area_name = 3;
+  string status = 4;
+  google.protobuf.Timestamp timestamp = 10; // 事件发生时间
+}

@@ -7,12 +7,12 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+
 	// !!! 替换模块路径 !!!
 	roomv1 "go-xlive/gen/go/room/v1"
 	"go-xlive/pkg/observability"
 
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
-	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health"
@@ -48,19 +48,26 @@ func NewGrpcServer(logger *zap.Logger, port int, roomSvc roomv1.RoomServiceServe
 		return nil, fmt.Errorf("监听 gRPC 端口 %d 失败: %w", port, err)
 	}
 
-	otelServerHandler := otelgrpc.NewServerHandler(
-		otelgrpc.WithTracerProvider(otel.GetTracerProvider()),
-		otelgrpc.WithPropagators(otel.GetTextMapPropagator()),
+	// 定义 OTel 拦截器选项，包括过滤健康检查
+	otelInterceptorOpts := []otelgrpc.Option{
+		// otelgrpc.WithTracerProvider(otel.GetTracerProvider()), // 通常会自动获取全局 Provider
+		// otelgrpc.WithPropagators(otel.GetTextMapPropagator()), // 通常会自动获取全局 Propagator
 		otelgrpc.WithFilter(func(info *stats.RPCTagInfo) bool {
+			// 过滤掉健康检查的追踪。返回 true 表示 *不* 追踪这个方法。
 			return info.FullMethodName == "/grpc.health.v1.Health/Check" ||
 				info.FullMethodName == "/grpc.health.v1.Health/Watch"
 		}),
-	)
+	}
 
 	s := grpc.NewServer(
-		grpc.StatsHandler(otelServerHandler),
 		grpc.ChainUnaryInterceptor(
-			observability.MetricsUnaryServerInterceptor(),
+			otelgrpc.UnaryServerInterceptor(otelInterceptorOpts...), // OTel Unary 拦截器
+			observability.MetricsUnaryServerInterceptor(),           // Metrics Unary 拦截器
+		),
+		grpc.ChainStreamInterceptor( // <-- 新增: 添加 Stream 拦截器链
+			otelgrpc.StreamServerInterceptor(otelInterceptorOpts...), // OTel Stream 拦截器
+			// 如果需要，也可以添加 Stream 的 Metrics 拦截器
+			// observability.MetricsStreamServerInterceptor(),
 		),
 	)
 

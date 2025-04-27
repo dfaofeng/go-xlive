@@ -23,24 +23,44 @@ const (
 	SessionService_CreateSession_FullMethodName           = "/session.v1.SessionService/CreateSession"
 	SessionService_EndSession_FullMethodName              = "/session.v1.SessionService/EndSession"
 	SessionService_GetSession_FullMethodName              = "/session.v1.SessionService/GetSession"
+	SessionService_GetLiveSessionByRoomID_FullMethodName  = "/session.v1.SessionService/GetLiveSessionByRoomID"
 	SessionService_UpdateSessionAggregates_FullMethodName = "/session.v1.SessionService/UpdateSessionAggregates"
+	SessionService_DeleteSession_FullMethodName           = "/session.v1.SessionService/DeleteSession"
 	SessionService_HealthCheck_FullMethodName             = "/session.v1.SessionService/HealthCheck"
 	SessionService_SendChatMessage_FullMethodName         = "/session.v1.SessionService/SendChatMessage"
+	SessionService_CheckSessionActive_FullMethodName      = "/session.v1.SessionService/CheckSessionActive"
+	SessionService_ListSessions_FullMethodName            = "/session.v1.SessionService/ListSessions"
+	SessionService_GetSessionDetails_FullMethodName       = "/session.v1.SessionService/GetSessionDetails"
+	SessionService_ListLiveSessions_FullMethodName        = "/session.v1.SessionService/ListLiveSessions"
 )
 
 // SessionServiceClient is the client API for SessionService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type SessionServiceClient interface {
+	// CreateSession is now triggered internally by platform events (e.g., LIVE)
 	CreateSession(ctx context.Context, in *CreateSessionRequest, opts ...grpc.CallOption) (*CreateSessionResponse, error)
+	// EndSession is now triggered internally by platform events (e.g., PREPARING)
 	EndSession(ctx context.Context, in *EndSessionRequest, opts ...grpc.CallOption) (*EndSessionResponse, error)
 	GetSession(ctx context.Context, in *GetSessionRequest, opts ...grpc.CallOption) (*GetSessionResponse, error)
+	// 新增: 根据房间 ID 获取当前直播中的场次
+	GetLiveSessionByRoomID(ctx context.Context, in *GetLiveSessionByRoomIDRequest, opts ...grpc.CallOption) (*GetLiveSessionByRoomIDResponse, error)
 	// 更新场次聚合统计 (新增)
 	UpdateSessionAggregates(ctx context.Context, in *UpdateSessionAggregatesRequest, opts ...grpc.CallOption) (*UpdateSessionAggregatesResponse, error)
+	// 新增: 删除场次
+	DeleteSession(ctx context.Context, in *DeleteSessionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// 健康检查
 	HealthCheck(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*HealthCheckResponse, error)
 	// 发送弹幕消息 (新增)
 	SendChatMessage(ctx context.Context, in *SendChatMessageRequest, opts ...grpc.CallOption) (*SendChatMessageResponse, error)
+	// 检查指定内部房间 ID 当前是否有活跃会话 (修正)
+	CheckSessionActive(ctx context.Context, in *CheckSessionActiveRequest, opts ...grpc.CallOption) (*CheckSessionActiveResponse, error)
+	// 新增: 获取会话列表
+	ListSessions(ctx context.Context, in *ListSessionsRequest, opts ...grpc.CallOption) (*ListSessionsResponse, error)
+	// 新增: 获取会话详情
+	GetSessionDetails(ctx context.Context, in *GetSessionRequest, opts ...grpc.CallOption) (*GetSessionResponse, error)
+	// 新增: 获取所有直播中场次的 ID
+	ListLiveSessions(ctx context.Context, in *ListLiveSessionsRequest, opts ...grpc.CallOption) (*ListLiveSessionsResponse, error)
 }
 
 type sessionServiceClient struct {
@@ -78,9 +98,27 @@ func (c *sessionServiceClient) GetSession(ctx context.Context, in *GetSessionReq
 	return out, nil
 }
 
+func (c *sessionServiceClient) GetLiveSessionByRoomID(ctx context.Context, in *GetLiveSessionByRoomIDRequest, opts ...grpc.CallOption) (*GetLiveSessionByRoomIDResponse, error) {
+	out := new(GetLiveSessionByRoomIDResponse)
+	err := c.cc.Invoke(ctx, SessionService_GetLiveSessionByRoomID_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *sessionServiceClient) UpdateSessionAggregates(ctx context.Context, in *UpdateSessionAggregatesRequest, opts ...grpc.CallOption) (*UpdateSessionAggregatesResponse, error) {
 	out := new(UpdateSessionAggregatesResponse)
 	err := c.cc.Invoke(ctx, SessionService_UpdateSessionAggregates_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *sessionServiceClient) DeleteSession(ctx context.Context, in *DeleteSessionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, SessionService_DeleteSession_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -105,19 +143,69 @@ func (c *sessionServiceClient) SendChatMessage(ctx context.Context, in *SendChat
 	return out, nil
 }
 
+func (c *sessionServiceClient) CheckSessionActive(ctx context.Context, in *CheckSessionActiveRequest, opts ...grpc.CallOption) (*CheckSessionActiveResponse, error) {
+	out := new(CheckSessionActiveResponse)
+	err := c.cc.Invoke(ctx, SessionService_CheckSessionActive_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *sessionServiceClient) ListSessions(ctx context.Context, in *ListSessionsRequest, opts ...grpc.CallOption) (*ListSessionsResponse, error) {
+	out := new(ListSessionsResponse)
+	err := c.cc.Invoke(ctx, SessionService_ListSessions_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *sessionServiceClient) GetSessionDetails(ctx context.Context, in *GetSessionRequest, opts ...grpc.CallOption) (*GetSessionResponse, error) {
+	out := new(GetSessionResponse)
+	err := c.cc.Invoke(ctx, SessionService_GetSessionDetails_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *sessionServiceClient) ListLiveSessions(ctx context.Context, in *ListLiveSessionsRequest, opts ...grpc.CallOption) (*ListLiveSessionsResponse, error) {
+	out := new(ListLiveSessionsResponse)
+	err := c.cc.Invoke(ctx, SessionService_ListLiveSessions_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SessionServiceServer is the server API for SessionService service.
 // All implementations should embed UnimplementedSessionServiceServer
 // for forward compatibility
 type SessionServiceServer interface {
+	// CreateSession is now triggered internally by platform events (e.g., LIVE)
 	CreateSession(context.Context, *CreateSessionRequest) (*CreateSessionResponse, error)
+	// EndSession is now triggered internally by platform events (e.g., PREPARING)
 	EndSession(context.Context, *EndSessionRequest) (*EndSessionResponse, error)
 	GetSession(context.Context, *GetSessionRequest) (*GetSessionResponse, error)
+	// 新增: 根据房间 ID 获取当前直播中的场次
+	GetLiveSessionByRoomID(context.Context, *GetLiveSessionByRoomIDRequest) (*GetLiveSessionByRoomIDResponse, error)
 	// 更新场次聚合统计 (新增)
 	UpdateSessionAggregates(context.Context, *UpdateSessionAggregatesRequest) (*UpdateSessionAggregatesResponse, error)
+	// 新增: 删除场次
+	DeleteSession(context.Context, *DeleteSessionRequest) (*emptypb.Empty, error)
 	// 健康检查
 	HealthCheck(context.Context, *emptypb.Empty) (*HealthCheckResponse, error)
 	// 发送弹幕消息 (新增)
 	SendChatMessage(context.Context, *SendChatMessageRequest) (*SendChatMessageResponse, error)
+	// 检查指定内部房间 ID 当前是否有活跃会话 (修正)
+	CheckSessionActive(context.Context, *CheckSessionActiveRequest) (*CheckSessionActiveResponse, error)
+	// 新增: 获取会话列表
+	ListSessions(context.Context, *ListSessionsRequest) (*ListSessionsResponse, error)
+	// 新增: 获取会话详情
+	GetSessionDetails(context.Context, *GetSessionRequest) (*GetSessionResponse, error)
+	// 新增: 获取所有直播中场次的 ID
+	ListLiveSessions(context.Context, *ListLiveSessionsRequest) (*ListLiveSessionsResponse, error)
 }
 
 // UnimplementedSessionServiceServer should be embedded to have forward compatible implementations.
@@ -133,14 +221,32 @@ func (UnimplementedSessionServiceServer) EndSession(context.Context, *EndSession
 func (UnimplementedSessionServiceServer) GetSession(context.Context, *GetSessionRequest) (*GetSessionResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetSession not implemented")
 }
+func (UnimplementedSessionServiceServer) GetLiveSessionByRoomID(context.Context, *GetLiveSessionByRoomIDRequest) (*GetLiveSessionByRoomIDResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetLiveSessionByRoomID not implemented")
+}
 func (UnimplementedSessionServiceServer) UpdateSessionAggregates(context.Context, *UpdateSessionAggregatesRequest) (*UpdateSessionAggregatesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateSessionAggregates not implemented")
+}
+func (UnimplementedSessionServiceServer) DeleteSession(context.Context, *DeleteSessionRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteSession not implemented")
 }
 func (UnimplementedSessionServiceServer) HealthCheck(context.Context, *emptypb.Empty) (*HealthCheckResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method HealthCheck not implemented")
 }
 func (UnimplementedSessionServiceServer) SendChatMessage(context.Context, *SendChatMessageRequest) (*SendChatMessageResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SendChatMessage not implemented")
+}
+func (UnimplementedSessionServiceServer) CheckSessionActive(context.Context, *CheckSessionActiveRequest) (*CheckSessionActiveResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CheckSessionActive not implemented")
+}
+func (UnimplementedSessionServiceServer) ListSessions(context.Context, *ListSessionsRequest) (*ListSessionsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListSessions not implemented")
+}
+func (UnimplementedSessionServiceServer) GetSessionDetails(context.Context, *GetSessionRequest) (*GetSessionResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetSessionDetails not implemented")
+}
+func (UnimplementedSessionServiceServer) ListLiveSessions(context.Context, *ListLiveSessionsRequest) (*ListLiveSessionsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListLiveSessions not implemented")
 }
 
 // UnsafeSessionServiceServer may be embedded to opt out of forward compatibility for this service.
@@ -208,6 +314,24 @@ func _SessionService_GetSession_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SessionService_GetLiveSessionByRoomID_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetLiveSessionByRoomIDRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SessionServiceServer).GetLiveSessionByRoomID(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SessionService_GetLiveSessionByRoomID_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SessionServiceServer).GetLiveSessionByRoomID(ctx, req.(*GetLiveSessionByRoomIDRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _SessionService_UpdateSessionAggregates_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(UpdateSessionAggregatesRequest)
 	if err := dec(in); err != nil {
@@ -222,6 +346,24 @@ func _SessionService_UpdateSessionAggregates_Handler(srv interface{}, ctx contex
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(SessionServiceServer).UpdateSessionAggregates(ctx, req.(*UpdateSessionAggregatesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SessionService_DeleteSession_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteSessionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SessionServiceServer).DeleteSession(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SessionService_DeleteSession_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SessionServiceServer).DeleteSession(ctx, req.(*DeleteSessionRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -262,6 +404,78 @@ func _SessionService_SendChatMessage_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SessionService_CheckSessionActive_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CheckSessionActiveRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SessionServiceServer).CheckSessionActive(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SessionService_CheckSessionActive_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SessionServiceServer).CheckSessionActive(ctx, req.(*CheckSessionActiveRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SessionService_ListSessions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListSessionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SessionServiceServer).ListSessions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SessionService_ListSessions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SessionServiceServer).ListSessions(ctx, req.(*ListSessionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SessionService_GetSessionDetails_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetSessionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SessionServiceServer).GetSessionDetails(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SessionService_GetSessionDetails_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SessionServiceServer).GetSessionDetails(ctx, req.(*GetSessionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SessionService_ListLiveSessions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListLiveSessionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SessionServiceServer).ListLiveSessions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SessionService_ListLiveSessions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SessionServiceServer).ListLiveSessions(ctx, req.(*ListLiveSessionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // SessionService_ServiceDesc is the grpc.ServiceDesc for SessionService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -282,8 +496,16 @@ var SessionService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _SessionService_GetSession_Handler,
 		},
 		{
+			MethodName: "GetLiveSessionByRoomID",
+			Handler:    _SessionService_GetLiveSessionByRoomID_Handler,
+		},
+		{
 			MethodName: "UpdateSessionAggregates",
 			Handler:    _SessionService_UpdateSessionAggregates_Handler,
+		},
+		{
+			MethodName: "DeleteSession",
+			Handler:    _SessionService_DeleteSession_Handler,
 		},
 		{
 			MethodName: "HealthCheck",
@@ -292,6 +514,22 @@ var SessionService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SendChatMessage",
 			Handler:    _SessionService_SendChatMessage_Handler,
+		},
+		{
+			MethodName: "CheckSessionActive",
+			Handler:    _SessionService_CheckSessionActive_Handler,
+		},
+		{
+			MethodName: "ListSessions",
+			Handler:    _SessionService_ListSessions_Handler,
+		},
+		{
+			MethodName: "GetSessionDetails",
+			Handler:    _SessionService_GetSessionDetails_Handler,
+		},
+		{
+			MethodName: "ListLiveSessions",
+			Handler:    _SessionService_ListLiveSessions_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

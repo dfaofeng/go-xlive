@@ -1,32 +1,32 @@
 server:
   user:
-    grpc_port: 50051
+    grpc_port: 8087
   room:
-    grpc_port: 50052
+    grpc_port: 8086
   session:
-    grpc_port: 50053
+    grpc_port: 8088
   event:            # 新增
-    grpc_port: 50054
+    grpc_port: 8084
   aggregation:      # 新增
-    grpc_port: 50055
+    grpc_port: 8083
   realtime:         # 新增
-    grpc_port: 50056
+    grpc_port: 8082
   gateway:
-    http_port: 8080
+    http_port: 8081
 
 client:
   user_service:
-    addresses: ["localhost:50051"]
+    addresses: ["localhost:8087"]
   room_service:
-    addresses: ["localhost:50052"]
+    addresses: ["localhost:8086"]
   session_service:
-    addresses: ["localhost:50053"]
+    addresses: ["localhost:8088"]
   event_service:      # 新增
-    addresses: ["localhost:50054"]
+    addresses: ["localhost:8084"]
   aggregation_service: # 新增
-    addresses: ["localhost:50055"]
+    addresses: ["localhost:8083"]
   realtime_service:    # 新增
-    addresses: ["localhost:50056"]
+    addresses: ["localhost:8082"]
 
 database:
   postgres_dsn: "postgres://user:password@fnos:123/liveroomdb?sslmode=disable"
@@ -38,3 +38,17 @@ redis:
 
 nats:
   url: "nats://fnos:125"
+
+# --- 新增: Adapter 配置 ---
+adapter:
+  bilibili:
+    listen_room_ids:
+      - 22746343  # 示例房间 ID 1
+      - 12345678  # 示例房间 ID 2
+      # - 添加更多需要监听的房间 ID
+# --- Adapter 配置结束 ---
+
+# --- 新增: OpenTelemetry 配置 ---
+otel:
+  otlp_endpoint: "fnos:4317" # <-- 修改: 更新为正确的 Collector 地址
+# --- OpenTelemetry 配置结束 ---

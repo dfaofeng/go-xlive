@@ -20,9 +20,13 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	RoomService_CreateRoom_FullMethodName  = "/room.v1.RoomService/CreateRoom"
-	RoomService_GetRoom_FullMethodName     = "/room.v1.RoomService/GetRoom"
-	RoomService_HealthCheck_FullMethodName = "/room.v1.RoomService/HealthCheck"
+	RoomService_CreateRoom_FullMethodName          = "/room.v1.RoomService/CreateRoom"
+	RoomService_GetRoom_FullMethodName             = "/room.v1.RoomService/GetRoom"
+	RoomService_UpdateRoom_FullMethodName          = "/room.v1.RoomService/UpdateRoom"
+	RoomService_ListRooms_FullMethodName           = "/room.v1.RoomService/ListRooms"
+	RoomService_GetRoomByPlatformID_FullMethodName = "/room.v1.RoomService/GetRoomByPlatformID"
+	RoomService_DeleteRoom_FullMethodName          = "/room.v1.RoomService/DeleteRoom"
+	RoomService_HealthCheck_FullMethodName         = "/room.v1.RoomService/HealthCheck"
 )
 
 // RoomServiceClient is the client API for RoomService service.
@@ -31,6 +35,14 @@ const (
 type RoomServiceClient interface {
 	CreateRoom(ctx context.Context, in *CreateRoomRequest, opts ...grpc.CallOption) (*CreateRoomResponse, error)
 	GetRoom(ctx context.Context, in *GetRoomRequest, opts ...grpc.CallOption) (*GetRoomResponse, error)
+	// 新增: 更新房间信息 (部分更新)
+	UpdateRoom(ctx context.Context, in *UpdateRoomRequest, opts ...grpc.CallOption) (*UpdateRoomResponse, error)
+	// 新增: 列出房间列表
+	ListRooms(ctx context.Context, in *ListRoomsRequest, opts ...grpc.CallOption) (*ListRoomsResponse, error)
+	// 新增: 根据平台 ID 获取房间
+	GetRoomByPlatformID(ctx context.Context, in *GetRoomByPlatformIDRequest, opts ...grpc.CallOption) (*GetRoomResponse, error)
+	// 新增: 删除房间
+	DeleteRoom(ctx context.Context, in *DeleteRoomRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// 健康检查 (新增)
 	HealthCheck(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*HealthCheckResponse, error)
 }
@@ -61,6 +73,42 @@ func (c *roomServiceClient) GetRoom(ctx context.Context, in *GetRoomRequest, opt
 	return out, nil
 }
 
+func (c *roomServiceClient) UpdateRoom(ctx context.Context, in *UpdateRoomRequest, opts ...grpc.CallOption) (*UpdateRoomResponse, error) {
+	out := new(UpdateRoomResponse)
+	err := c.cc.Invoke(ctx, RoomService_UpdateRoom_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *roomServiceClient) ListRooms(ctx context.Context, in *ListRoomsRequest, opts ...grpc.CallOption) (*ListRoomsResponse, error) {
+	out := new(ListRoomsResponse)
+	err := c.cc.Invoke(ctx, RoomService_ListRooms_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *roomServiceClient) GetRoomByPlatformID(ctx context.Context, in *GetRoomByPlatformIDRequest, opts ...grpc.CallOption) (*GetRoomResponse, error) {
+	out := new(GetRoomResponse)
+	err := c.cc.Invoke(ctx, RoomService_GetRoomByPlatformID_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *roomServiceClient) DeleteRoom(ctx context.Context, in *DeleteRoomRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, RoomService_DeleteRoom_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *roomServiceClient) HealthCheck(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*HealthCheckResponse, error) {
 	out := new(HealthCheckResponse)
 	err := c.cc.Invoke(ctx, RoomService_HealthCheck_FullMethodName, in, out, opts...)
@@ -76,6 +124,14 @@ func (c *roomServiceClient) HealthCheck(ctx context.Context, in *emptypb.Empty, 
 type RoomServiceServer interface {
 	CreateRoom(context.Context, *CreateRoomRequest) (*CreateRoomResponse, error)
 	GetRoom(context.Context, *GetRoomRequest) (*GetRoomResponse, error)
+	// 新增: 更新房间信息 (部分更新)
+	UpdateRoom(context.Context, *UpdateRoomRequest) (*UpdateRoomResponse, error)
+	// 新增: 列出房间列表
+	ListRooms(context.Context, *ListRoomsRequest) (*ListRoomsResponse, error)
+	// 新增: 根据平台 ID 获取房间
+	GetRoomByPlatformID(context.Context, *GetRoomByPlatformIDRequest) (*GetRoomResponse, error)
+	// 新增: 删除房间
+	DeleteRoom(context.Context, *DeleteRoomRequest) (*emptypb.Empty, error)
 	// 健康检查 (新增)
 	HealthCheck(context.Context, *emptypb.Empty) (*HealthCheckResponse, error)
 }
@@ -89,6 +145,18 @@ func (UnimplementedRoomServiceServer) CreateRoom(context.Context, *CreateRoomReq
 }
 func (UnimplementedRoomServiceServer) GetRoom(context.Context, *GetRoomRequest) (*GetRoomResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetRoom not implemented")
+}
+func (UnimplementedRoomServiceServer) UpdateRoom(context.Context, *UpdateRoomRequest) (*UpdateRoomResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateRoom not implemented")
+}
+func (UnimplementedRoomServiceServer) ListRooms(context.Context, *ListRoomsRequest) (*ListRoomsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListRooms not implemented")
+}
+func (UnimplementedRoomServiceServer) GetRoomByPlatformID(context.Context, *GetRoomByPlatformIDRequest) (*GetRoomResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetRoomByPlatformID not implemented")
+}
+func (UnimplementedRoomServiceServer) DeleteRoom(context.Context, *DeleteRoomRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteRoom not implemented")
 }
 func (UnimplementedRoomServiceServer) HealthCheck(context.Context, *emptypb.Empty) (*HealthCheckResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method HealthCheck not implemented")
@@ -141,6 +209,78 @@ func _RoomService_GetRoom_Handler(srv interface{}, ctx context.Context, dec func
 	return interceptor(ctx, in, info, handler)
 }
 
+func _RoomService_UpdateRoom_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateRoomRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RoomServiceServer).UpdateRoom(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RoomService_UpdateRoom_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RoomServiceServer).UpdateRoom(ctx, req.(*UpdateRoomRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RoomService_ListRooms_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListRoomsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RoomServiceServer).ListRooms(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RoomService_ListRooms_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RoomServiceServer).ListRooms(ctx, req.(*ListRoomsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RoomService_GetRoomByPlatformID_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetRoomByPlatformIDRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RoomServiceServer).GetRoomByPlatformID(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RoomService_GetRoomByPlatformID_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RoomServiceServer).GetRoomByPlatformID(ctx, req.(*GetRoomByPlatformIDRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _RoomService_DeleteRoom_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteRoomRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RoomServiceServer).DeleteRoom(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RoomService_DeleteRoom_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RoomServiceServer).DeleteRoom(ctx, req.(*DeleteRoomRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _RoomService_HealthCheck_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
@@ -173,6 +313,22 @@ var RoomService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetRoom",
 			Handler:    _RoomService_GetRoom_Handler,
+		},
+		{
+			MethodName: "UpdateRoom",
+			Handler:    _RoomService_UpdateRoom_Handler,
+		},
+		{
+			MethodName: "ListRooms",
+			Handler:    _RoomService_ListRooms_Handler,
+		},
+		{
+			MethodName: "GetRoomByPlatformID",
+			Handler:    _RoomService_GetRoomByPlatformID_Handler,
+		},
+		{
+			MethodName: "DeleteRoom",
+			Handler:    _RoomService_DeleteRoom_Handler,
 		},
 		{
 			MethodName: "HealthCheck",

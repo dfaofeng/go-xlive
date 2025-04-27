@@ -11,11 +11,17 @@ import (
 type Session struct {
 	SessionID       string             `json:"session_id"`
 	RoomID          string             `json:"room_id"`
+	OwnerUserID     string             `json:"owner_user_id"`
 	StartTime       pgtype.Timestamptz `json:"start_time"`
 	EndTime         pgtype.Timestamptz `json:"end_time"`
 	Status          string             `json:"status"`
-	CreatedAt       pgtype.Timestamptz `json:"created_at"`
 	TotalEvents     int64              `json:"total_events"`
 	TotalDanmaku    int64              `json:"total_danmaku"`
 	TotalGiftsValue int64              `json:"total_gifts_value"`
+	TotalLikes      int64              `json:"total_likes"`
+	TotalWatched    int64              `json:"total_watched"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	SessionTitle    pgtype.Text        `json:"session_title"`
+	AnchorName      pgtype.Text        `json:"anchor_name"`
+	RoomTitle       pgtype.Text        `json:"room_title"`
 }

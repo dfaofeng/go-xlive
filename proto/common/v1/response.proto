@@ -1,0 +1,38 @@
+// common/response.proto
+syntax = "proto3";
+
+package common.v1; // 通用相应返回体
+
+import "google/protobuf/any.proto";
+import "protoc-gen-openapiv2/options/annotations.proto"; // 必须导入
+
+option go_package = "go-xlive/gen/go/common/v1;commonv1";
+// 统一的 HTTP 响应包装器
+message StandardHttpResponse {
+  option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_schema) = {
+    json_schema: {
+      title: "Standard API Response";
+      description: "Standard structure for all API responses";
+      required: ["code", "message"]; // 根据你的实际情况
+    }
+  };
+
+  int32 code = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Business status code (0 for success)";
+      example: "0"; // 注意 example 是 JSON 格式的字符串
+    }
+  ];
+  string message = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Response message";
+      example: "\"success\"";
+    }
+  ];
+  // 使用 Any 来表示 data 可以是任何 gRPC 原始响应类型
+  google.protobuf.Any data = 3 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Actual response data";
+    }
+  ];
+}

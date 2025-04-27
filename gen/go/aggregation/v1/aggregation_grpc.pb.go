@@ -20,8 +20,10 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	AggregationService_TriggerAggregation_FullMethodName = "/aggregation.v1.AggregationService/TriggerAggregation"
-	AggregationService_HealthCheck_FullMethodName        = "/aggregation.v1.AggregationService/HealthCheck"
+	AggregationService_TriggerAggregation_FullMethodName        = "/aggregation.v1.AggregationService/TriggerAggregation"
+	AggregationService_HandleStreamStatus_FullMethodName        = "/aggregation.v1.AggregationService/HandleStreamStatus"
+	AggregationService_HealthCheck_FullMethodName               = "/aggregation.v1.AggregationService/HealthCheck"
+	AggregationService_GetSessionMetricsTimeline_FullMethodName = "/aggregation.v1.AggregationService/GetSessionMetricsTimeline"
 )
 
 // AggregationServiceClient is the client API for AggregationService service.
@@ -29,7 +31,11 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type AggregationServiceClient interface {
 	TriggerAggregation(ctx context.Context, in *TriggerAggregationRequest, opts ...grpc.CallOption) (*TriggerAggregationResponse, error)
+	// 新增：处理流状态变化的 RPC
+	HandleStreamStatus(ctx context.Context, in *StreamStatus, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	HealthCheck(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*HealthCheckResponse, error)
+	// 新增: 查询场次指标时间线
+	GetSessionMetricsTimeline(ctx context.Context, in *GetSessionMetricsTimelineRequest, opts ...grpc.CallOption) (*GetSessionMetricsTimelineResponse, error)
 }
 
 type aggregationServiceClient struct {
@@ -49,9 +55,27 @@ func (c *aggregationServiceClient) TriggerAggregation(ctx context.Context, in *T
 	return out, nil
 }
 
+func (c *aggregationServiceClient) HandleStreamStatus(ctx context.Context, in *StreamStatus, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, AggregationService_HandleStreamStatus_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *aggregationServiceClient) HealthCheck(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*HealthCheckResponse, error) {
 	out := new(HealthCheckResponse)
 	err := c.cc.Invoke(ctx, AggregationService_HealthCheck_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *aggregationServiceClient) GetSessionMetricsTimeline(ctx context.Context, in *GetSessionMetricsTimelineRequest, opts ...grpc.CallOption) (*GetSessionMetricsTimelineResponse, error) {
+	out := new(GetSessionMetricsTimelineResponse)
+	err := c.cc.Invoke(ctx, AggregationService_GetSessionMetricsTimeline_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +87,11 @@ func (c *aggregationServiceClient) HealthCheck(ctx context.Context, in *emptypb.
 // for forward compatibility
 type AggregationServiceServer interface {
 	TriggerAggregation(context.Context, *TriggerAggregationRequest) (*TriggerAggregationResponse, error)
+	// 新增：处理流状态变化的 RPC
+	HandleStreamStatus(context.Context, *StreamStatus) (*emptypb.Empty, error)
 	HealthCheck(context.Context, *emptypb.Empty) (*HealthCheckResponse, error)
+	// 新增: 查询场次指标时间线
+	GetSessionMetricsTimeline(context.Context, *GetSessionMetricsTimelineRequest) (*GetSessionMetricsTimelineResponse, error)
 }
 
 // UnimplementedAggregationServiceServer should be embedded to have forward compatible implementations.
@@ -73,8 +101,14 @@ type UnimplementedAggregationServiceServer struct {
 func (UnimplementedAggregationServiceServer) TriggerAggregation(context.Context, *TriggerAggregationRequest) (*TriggerAggregationResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method TriggerAggregation not implemented")
 }
+func (UnimplementedAggregationServiceServer) HandleStreamStatus(context.Context, *StreamStatus) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method HandleStreamStatus not implemented")
+}
 func (UnimplementedAggregationServiceServer) HealthCheck(context.Context, *emptypb.Empty) (*HealthCheckResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method HealthCheck not implemented")
+}
+func (UnimplementedAggregationServiceServer) GetSessionMetricsTimeline(context.Context, *GetSessionMetricsTimelineRequest) (*GetSessionMetricsTimelineResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetSessionMetricsTimeline not implemented")
 }
 
 // UnsafeAggregationServiceServer may be embedded to opt out of forward compatibility for this service.
@@ -106,6 +140,24 @@ func _AggregationService_TriggerAggregation_Handler(srv interface{}, ctx context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AggregationService_HandleStreamStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StreamStatus)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AggregationServiceServer).HandleStreamStatus(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AggregationService_HandleStreamStatus_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AggregationServiceServer).HandleStreamStatus(ctx, req.(*StreamStatus))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _AggregationService_HealthCheck_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
@@ -124,6 +176,24 @@ func _AggregationService_HealthCheck_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AggregationService_GetSessionMetricsTimeline_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetSessionMetricsTimelineRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AggregationServiceServer).GetSessionMetricsTimeline(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AggregationService_GetSessionMetricsTimeline_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AggregationServiceServer).GetSessionMetricsTimeline(ctx, req.(*GetSessionMetricsTimelineRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AggregationService_ServiceDesc is the grpc.ServiceDesc for AggregationService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -136,8 +206,16 @@ var AggregationService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _AggregationService_TriggerAggregation_Handler,
 		},
 		{
+			MethodName: "HandleStreamStatus",
+			Handler:    _AggregationService_HandleStreamStatus_Handler,
+		},
+		{
 			MethodName: "HealthCheck",
 			Handler:    _AggregationService_HealthCheck_Handler,
+		},
+		{
+			MethodName: "GetSessionMetricsTimeline",
+			Handler:    _AggregationService_GetSessionMetricsTimeline_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

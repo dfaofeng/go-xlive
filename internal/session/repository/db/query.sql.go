@@ -12,40 +12,70 @@ import (
 )
 
 const createSession = `-- name: CreateSession :one
-INSERT INTO sessions (session_id, room_id, start_time, status) VALUES ($1, $2, $3, $4) RETURNING session_id, room_id, start_time, end_time, status, created_at, total_events, total_danmaku, total_gifts_value
+INSERT INTO sessions (
+    session_id, room_id, owner_user_id, start_time, status, session_title, anchor_name, room_title
+) VALUES (
+    $1, $2, $3, $4, $5, $6, $7, $8 -- $8 is room_title
+) RETURNING session_id, room_id, owner_user_id, start_time, end_time, status, total_events, total_danmaku, total_gifts_value, total_likes, total_watched, created_at, session_title, anchor_name, room_title
 `
 
 type CreateSessionParams struct {
-	SessionID string             `json:"session_id"`
-	RoomID    string             `json:"room_id"`
-	StartTime pgtype.Timestamptz `json:"start_time"`
-	Status    string             `json:"status"`
+	SessionID    string             `json:"session_id"`
+	RoomID       string             `json:"room_id"`
+	OwnerUserID  string             `json:"owner_user_id"`
+	StartTime    pgtype.Timestamptz `json:"start_time"`
+	Status       string             `json:"status"`
+	SessionTitle pgtype.Text        `json:"session_title"`
+	AnchorName   pgtype.Text        `json:"anchor_name"`
+	RoomTitle    pgtype.Text        `json:"room_title"`
 }
 
+// !!! 修正: 添加 room_title 列 !!!
 func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error) {
 	row := q.db.QueryRow(ctx, createSession,
 		arg.SessionID,
 		arg.RoomID,
+		arg.OwnerUserID,
 		arg.StartTime,
 		arg.Status,
+		arg.SessionTitle,
+		arg.AnchorName,
+		arg.RoomTitle,
 	)
 	var i Session
 	err := row.Scan(
 		&i.SessionID,
 		&i.RoomID,
+		&i.OwnerUserID,
 		&i.StartTime,
 		&i.EndTime,
 		&i.Status,
-		&i.CreatedAt,
 		&i.TotalEvents,
 		&i.TotalDanmaku,
 		&i.TotalGiftsValue,
+		&i.TotalLikes,
+		&i.TotalWatched,
+		&i.CreatedAt,
+		&i.SessionTitle,
+		&i.AnchorName,
+		&i.RoomTitle,
 	)
 	return i, err
 }
 
+const deleteSession = `-- name: DeleteSession :exec
+DELETE FROM sessions
+WHERE session_id = $1
+`
+
+// 根据场次 ID 删除场次
+func (q *Queries) DeleteSession(ctx context.Context, sessionID string) error {
+	_, err := q.db.Exec(ctx, deleteSession, sessionID)
+	return err
+}
+
 const endSession = `-- name: EndSession :one
-UPDATE sessions SET status = 'ended', end_time = $2 WHERE session_id = $1 AND status = 'live' RETURNING session_id, room_id, start_time, end_time, status, created_at, total_events, total_danmaku, total_gifts_value
+UPDATE sessions SET status = 'ended', end_time = $2 WHERE session_id = $1 AND status = 'live' RETURNING session_id, room_id, owner_user_id, start_time, end_time, status, total_events, total_danmaku, total_gifts_value, total_likes, total_watched, created_at, session_title, anchor_name, room_title
 `
 
 type EndSessionParams struct {
@@ -59,19 +89,91 @@ func (q *Queries) EndSession(ctx context.Context, arg EndSessionParams) (Session
 	err := row.Scan(
 		&i.SessionID,
 		&i.RoomID,
+		&i.OwnerUserID,
 		&i.StartTime,
 		&i.EndTime,
 		&i.Status,
-		&i.CreatedAt,
 		&i.TotalEvents,
 		&i.TotalDanmaku,
 		&i.TotalGiftsValue,
+		&i.TotalLikes,
+		&i.TotalWatched,
+		&i.CreatedAt,
+		&i.SessionTitle,
+		&i.AnchorName,
+		&i.RoomTitle,
 	)
 	return i, err
 }
 
+const getLiveSessionByRoomID = `-- name: GetLiveSessionByRoomID :one
+SELECT session_id, room_id, owner_user_id, start_time, end_time, status, total_events, total_danmaku, total_gifts_value, total_likes, total_watched, created_at, session_title, anchor_name, room_title FROM sessions WHERE room_id = $1 AND status = 'live' LIMIT 1
+`
+
+func (q *Queries) GetLiveSessionByRoomID(ctx context.Context, roomID string) (Session, error) {
+	row := q.db.QueryRow(ctx, getLiveSessionByRoomID, roomID)
+	var i Session
+	err := row.Scan(
+		&i.SessionID,
+		&i.RoomID,
+		&i.OwnerUserID,
+		&i.StartTime,
+		&i.EndTime,
+		&i.Status,
+		&i.TotalEvents,
+		&i.TotalDanmaku,
+		&i.TotalGiftsValue,
+		&i.TotalLikes,
+		&i.TotalWatched,
+		&i.CreatedAt,
+		&i.SessionTitle,
+		&i.AnchorName,
+		&i.RoomTitle,
+	)
+	return i, err
+}
+
+const getLiveSessionIDByRoomID = `-- name: GetLiveSessionIDByRoomID :one
+
+
+SELECT session_id
+FROM sessions
+WHERE room_id = $1 AND status = 'live'
+LIMIT 1
+`
+
+// --- 移除 UpdateSessionRoomInfo 查询 ---
+// -- name: UpdateSessionRoomInfo :many
+// -- 根据 room_id 更新所有直播中场次的房间信息
+// UPDATE sessions
+// SET
+//
+//	room_title = $2, -- $1 room_id, $2 room_title
+//	area_name = $3  -- $3 area_name
+//
+// WHERE room_id = $1 AND status = 'live'
+// RETURNING *; -- 返回所有被更新的场次
+// --- 移除 UpdateSessionOwnerInfo 查询 ---
+// -- name: UpdateSessionOwnerInfo :many
+// -- 根据 owner_user_id 更新所有直播中场次的主播信息
+// UPDATE sessions
+// SET
+//
+//	owner_name = $2,     -- $1 owner_user_id, $2 owner_name
+//	follower_count = $3 -- $3 follower_count
+//
+// WHERE owner_user_id = $1 AND status = 'live'
+// RETURNING *; -- 返回所有被更新的场次
+// 根据内部 room_id 查找活跃会话的 session_id
+func (q *Queries) GetLiveSessionIDByRoomID(ctx context.Context, roomID string) (string, error) {
+	row := q.db.QueryRow(ctx, getLiveSessionIDByRoomID, roomID)
+	var session_id string
+	err := row.Scan(&session_id)
+	return session_id, err
+}
+
 const getSessionByID = `-- name: GetSessionByID :one
-SELECT session_id, room_id, start_time, end_time, status, created_at, total_events, total_danmaku, total_gifts_value FROM sessions WHERE session_id = $1 LIMIT 1
+SELECT session_id, room_id, owner_user_id, start_time, end_time, status, total_events, total_danmaku, total_gifts_value, total_likes, total_watched, created_at, session_title, anchor_name, room_title FROM sessions WHERE session_id = $1 LIMIT 1
 `
 
 func (q *Queries) GetSessionByID(ctx context.Context, sessionID string) (Session, error) {
@@ -80,19 +182,142 @@ func (q *Queries) GetSessionByID(ctx context.Context, sessionID string) (Session
 	err := row.Scan(
 		&i.SessionID,
 		&i.RoomID,
+		&i.OwnerUserID,
 		&i.StartTime,
 		&i.EndTime,
 		&i.Status,
-		&i.CreatedAt,
 		&i.TotalEvents,
 		&i.TotalDanmaku,
 		&i.TotalGiftsValue,
+		&i.TotalLikes,
+		&i.TotalWatched,
+		&i.CreatedAt,
+		&i.SessionTitle,
+		&i.AnchorName,
+		&i.RoomTitle,
 	)
 	return i, err
 }
 
+const getSessionsCount = `-- name: GetSessionsCount :one
+SELECT COUNT(*)
+FROM sessions
+WHERE (status = $1 OR $1::text = '')
+  AND (room_id = $2 OR $2::text = '')
+  AND (owner_user_id = $3 OR $3::text = '')
+`
+
+type GetSessionsCountParams struct {
+	Status      string `json:"status"`
+	RoomID      string `json:"room_id"`
+	OwnerUserID string `json:"owner_user_id"`
+}
+
+// 获取符合条件的场次总数
+func (q *Queries) GetSessionsCount(ctx context.Context, arg GetSessionsCountParams) (int64, error) {
+	row := q.db.QueryRow(ctx, getSessionsCount, arg.Status, arg.RoomID, arg.OwnerUserID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const listLiveSessionIDs = `-- name: ListLiveSessionIDs :many
+SELECT session_id
+FROM sessions
+WHERE status = 'live'
+`
+
+func (q *Queries) ListLiveSessionIDs(ctx context.Context) ([]string, error) {
+	rows, err := q.db.Query(ctx, listLiveSessionIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var session_id string
+		if err := rows.Scan(&session_id); err != nil {
+			return nil, err
+		}
+		items = append(items, session_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listSessions = `-- name: ListSessions :many
+SELECT session_id, room_id, owner_user_id, start_time, end_time, status, total_events, total_danmaku, total_gifts_value, total_likes, total_watched, created_at, session_title, anchor_name, room_title
+FROM sessions
+WHERE (status = $3 OR $3::text = '')
+  AND (room_id = $4 OR $4::text = '')
+  AND (owner_user_id = $5 OR $5::text = '')
+ORDER BY created_at DESC
+LIMIT $1 OFFSET $2
+`
+
+type ListSessionsParams struct {
+	Limit       int32  `json:"limit"`
+	Offset      int32  `json:"offset"`
+	Status      string `json:"status"`
+	RoomID      string `json:"room_id"`
+	OwnerUserID string `json:"owner_user_id"`
+}
+
+// 列出所有场次，支持分页和过滤
+func (q *Queries) ListSessions(ctx context.Context, arg ListSessionsParams) ([]Session, error) {
+	rows, err := q.db.Query(ctx, listSessions,
+		arg.Limit,
+		arg.Offset,
+		arg.Status,
+		arg.RoomID,
+		arg.OwnerUserID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Session{}
+	for rows.Next() {
+		var i Session
+		if err := rows.Scan(
+			&i.SessionID,
+			&i.RoomID,
+			&i.OwnerUserID,
+			&i.StartTime,
+			&i.EndTime,
+			&i.Status,
+			&i.TotalEvents,
+			&i.TotalDanmaku,
+			&i.TotalGiftsValue,
+			&i.TotalLikes,
+			&i.TotalWatched,
+			&i.CreatedAt,
+			&i.SessionTitle,
+			&i.AnchorName,
+			&i.RoomTitle,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateSessionAggregates = `-- name: UpdateSessionAggregates :one
-UPDATE sessions SET total_events = $2, total_danmaku = $3, total_gifts_value = $4 WHERE session_id = $1 RETURNING session_id, room_id, start_time, end_time, status, created_at, total_events, total_danmaku, total_gifts_value
+UPDATE sessions
+SET
+    total_events = $2,
+    total_danmaku = $3,
+    total_gifts_value = $4,
+    total_likes = $5,
+    total_watched = $6
+WHERE session_id = $1
+RETURNING session_id, room_id, owner_user_id, start_time, end_time, status, total_events, total_danmaku, total_gifts_value, total_likes, total_watched, created_at, session_title, anchor_name, room_title
 `
 
 type UpdateSessionAggregatesParams struct {
@@ -100,6 +325,8 @@ type UpdateSessionAggregatesParams struct {
 	TotalEvents     int64  `json:"total_events"`
 	TotalDanmaku    int64  `json:"total_danmaku"`
 	TotalGiftsValue int64  `json:"total_gifts_value"`
+	TotalLikes      int64  `json:"total_likes"`
+	TotalWatched    int64  `json:"total_watched"`
 }
 
 func (q *Queries) UpdateSessionAggregates(ctx context.Context, arg UpdateSessionAggregatesParams) (Session, error) {
@@ -108,18 +335,26 @@ func (q *Queries) UpdateSessionAggregates(ctx context.Context, arg UpdateSession
 		arg.TotalEvents,
 		arg.TotalDanmaku,
 		arg.TotalGiftsValue,
+		arg.TotalLikes,
+		arg.TotalWatched,
 	)
 	var i Session
 	err := row.Scan(
 		&i.SessionID,
 		&i.RoomID,
+		&i.OwnerUserID,
 		&i.StartTime,
 		&i.EndTime,
 		&i.Status,
-		&i.CreatedAt,
 		&i.TotalEvents,
 		&i.TotalDanmaku,
 		&i.TotalGiftsValue,
+		&i.TotalLikes,
+		&i.TotalWatched,
+		&i.CreatedAt,
+		&i.SessionTitle,
+		&i.AnchorName,
+		&i.RoomTitle,
 	)
 	return i, err
 }

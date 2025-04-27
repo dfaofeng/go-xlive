@@ -1,14 +1,80 @@
 syntax = "proto3";
+
 package aggregation.v1;
+
 import "google/protobuf/empty.proto";
 import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto"; // 导入 Timestamp
 import "session/v1/session.proto";
-// !!! 替换模块路径 !!!
+
 option go_package = "go-xlive/gen/go/aggregation/v1;aggregationv1";
-service AggregationService {
-  rpc TriggerAggregation(TriggerAggregationRequest) returns (TriggerAggregationResponse) { option (google.api.http) = { post: "/v1/aggregation/trigger" body: "*" }; }
-  rpc HealthCheck(google.protobuf.Empty) returns (HealthCheckResponse) { option (google.api.http) = { get: "/v1/aggregation/healthz" }; }
+
+// StreamStatus 消息定义
+message StreamStatus {
+  string session_id = 1;
+  string room_id = 2;
+  bool is_live = 3;
+  google.protobuf.Timestamp timestamp = 4;
 }
+
+service AggregationService {
+  rpc TriggerAggregation(TriggerAggregationRequest) returns (TriggerAggregationResponse) {
+    option (google.api.http) = {
+      post: "/v1/aggregation/trigger"
+      body: "*"
+    };
+  }
+
+  // 新增：处理流状态变化的 RPC
+  rpc HandleStreamStatus(StreamStatus) returns (google.protobuf.Empty) {}
+
+  rpc HealthCheck(google.protobuf.Empty) returns (HealthCheckResponse) {
+    option (google.api.http) = {
+      get: "/v1/aggregation/healthz"
+    };
+  }
+
+  // 新增: 查询场次指标时间线
+  rpc GetSessionMetricsTimeline(GetSessionMetricsTimelineRequest) returns (GetSessionMetricsTimelineResponse) {
+    option (google.api.http) = {
+      // 使用 GET 请求，参数通过 query string 传递
+      // session_id 从路径中获取，start_time 和 end_time 从查询参数获取
+      get: "/v1/aggregation/sessions/{session_id}/timeline"
+    };
+  }
+}
+
 message TriggerAggregationRequest { string session_id = 1; }
+
 message TriggerAggregationResponse { session.v1.Session updated_session = 1; }
+
 message HealthCheckResponse { string status = 1; }
+
+// --- 新增: 时间线查询相关定义 ---
+
+// SessionMetricPoint 代表时间线上的一个数据点
+message SessionMetricPoint {
+  google.protobuf.Timestamp timestamp = 1; // 数据点时间戳
+  int64 danmaku_count = 2;                 // 累计弹幕数
+  int64 gift_value = 3;                    // 累计礼物价值
+  int64 like_count = 4;                    // 累计点赞数
+  int64 watched_count = 5;                 // 当前观看人数 (如果可用)
+  int64 online_rank_count = 6;             // 在线排名计数 (新增)
+}
+
+// GetSessionMetricsTimelineRequest 定义查询时间线的请求参数
+message GetSessionMetricsTimelineRequest {
+  string session_id = 1;                   // 要查询的场次 ID
+  google.protobuf.Timestamp start_time = 2; // 查询开始时间 (包含)
+  google.protobuf.Timestamp end_time = 3;   // 查询结束时间 (包含)
+  // 可以添加分页参数 (可选)
+  // int32 page_size = 4;
+  // string page_token = 5;
+}
+
+// GetSessionMetricsTimelineResponse 定义查询时间线的响应结果
+message GetSessionMetricsTimelineResponse {
+  repeated SessionMetricPoint data_points = 1; // 时间线数据点列表
+  // 可以添加分页信息 (可选)
+  // string next_page_token = 2;
+}

@@ -32,6 +32,40 @@ var _ = runtime.String
 var _ = utilities.NewDoubleArray
 var _ = metadata.Join
 
+func request_RealtimeService_SubscribeSessionEvents_0(ctx context.Context, marshaler runtime.Marshaler, client RealtimeServiceClient, req *http.Request, pathParams map[string]string) (RealtimeService_SubscribeSessionEventsClient, runtime.ServerMetadata, error) {
+	var protoReq SubscribeSessionEventsRequest
+	var metadata runtime.ServerMetadata
+
+	var (
+		val string
+		ok  bool
+		err error
+		_   = err
+	)
+
+	val, ok = pathParams["session_id"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "session_id")
+	}
+
+	protoReq.SessionId, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "session_id", err)
+	}
+
+	stream, err := client.SubscribeSessionEvents(ctx, &protoReq)
+	if err != nil {
+		return nil, metadata, err
+	}
+	header, err := stream.Header()
+	if err != nil {
+		return nil, metadata, err
+	}
+	metadata.HeaderMD = header
+	return stream, metadata, nil
+
+}
+
 func request_RealtimeService_HealthCheck_0(ctx context.Context, marshaler runtime.Marshaler, client RealtimeServiceClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var protoReq emptypb.Empty
 	var metadata runtime.ServerMetadata
@@ -55,6 +89,13 @@ func local_request_RealtimeService_HealthCheck_0(ctx context.Context, marshaler 
 // StreamingRPC :currently unsupported pending https://github.com/grpc/grpc-go/issues/906.
 // Note that using this registration option will cause many gRPC library features to stop working. Consider using RegisterRealtimeServiceHandlerFromEndpoint instead.
 func RegisterRealtimeServiceHandlerServer(ctx context.Context, mux *runtime.ServeMux, server RealtimeServiceServer) error {
+
+	mux.Handle("GET", pattern_RealtimeService_SubscribeSessionEvents_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		err := status.Error(codes.Unimplemented, "streaming calls are not yet supported in the in-process transport")
+		_, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+		return
+	})
 
 	mux.Handle("GET", pattern_RealtimeService_HealthCheck_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
@@ -122,6 +163,28 @@ func RegisterRealtimeServiceHandler(ctx context.Context, mux *runtime.ServeMux, 
 // "RealtimeServiceClient" to call the correct interceptors.
 func RegisterRealtimeServiceHandlerClient(ctx context.Context, mux *runtime.ServeMux, client RealtimeServiceClient) error {
 
+	mux.Handle("GET", pattern_RealtimeService_SubscribeSessionEvents_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		var err error
+		var annotatedContext context.Context
+		annotatedContext, err = runtime.AnnotateContext(ctx, mux, req, "/realtime.v1.RealtimeService/SubscribeSessionEvents", runtime.WithHTTPPathPattern("/v1/realtime/subscribe/{session_id}"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := request_RealtimeService_SubscribeSessionEvents_0(annotatedContext, inboundMarshaler, client, req, pathParams)
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+
+		forward_RealtimeService_SubscribeSessionEvents_0(annotatedContext, mux, outboundMarshaler, w, req, func() (proto.Message, error) { return resp.Recv() }, mux.GetForwardResponseOptions()...)
+
+	})
+
 	mux.Handle("GET", pattern_RealtimeService_HealthCheck_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
@@ -148,9 +211,13 @@ func RegisterRealtimeServiceHandlerClient(ctx context.Context, mux *runtime.Serv
 }
 
 var (
+	pattern_RealtimeService_SubscribeSessionEvents_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3}, []string{"v1", "realtime", "subscribe", "session_id"}, ""))
+
 	pattern_RealtimeService_HealthCheck_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"v1", "realtime", "healthz"}, ""))
 )
 
 var (
+	forward_RealtimeService_SubscribeSessionEvents_0 = runtime.ForwardResponseStream
+
 	forward_RealtimeService_HealthCheck_0 = runtime.ForwardResponseMessage
 )

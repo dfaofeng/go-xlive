@@ -4,6 +4,9 @@ package user.v1;
 
 import "google/api/annotations.proto";
 import "google/protobuf/empty.proto"; // 导入 Empty
+import "google/protobuf/field_mask.proto"; // 导入 FieldMask 用于部分更新
+import "google/protobuf/timestamp.proto"; // 导入 Timestamp 用于事件
+import "protoc-gen-openapiv2/options/annotations.proto"; // <-- 添加导入
 
 // !!! 替换模块路径 !!!
 option go_package = "go-xlive/gen/go/user/v1;userv1";
@@ -11,20 +14,105 @@ option go_package = "go-xlive/gen/go/user/v1;userv1";
 service UserService {
   rpc CreateUser(CreateUserRequest) returns (CreateUserResponse) {
     option (google.api.http) = { post: "/v1/users" body: "*" };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "创建新用户"
+    };
   }
   rpc GetUser(GetUserRequest) returns (GetUserResponse) {
     option (google.api.http) = { get: "/v1/users/{user_id}" };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "获取用户信息"
+    };
+  }
+  // 新增: 更新用户信息 (部分更新)
+  rpc UpdateUser(UpdateUserRequest) returns (UpdateUserResponse) {
+     option (google.api.http) = {
+       patch: "/v1/users/{user.user_id}" // 使用 PATCH
+       body: "user"
+       additional_bindings {
+         put: "/v1/users/{user.user_id}" // 也支持 PUT (完全替换)
+         body: "user"
+       }
+     };
+     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+       summary: "更新用户信息"
+       description: "部分更新用户信息，支持更新 username 和 follower_count。"
+     };
   }
   // 健康检查 (新增)
   rpc HealthCheck(google.protobuf.Empty) returns (HealthCheckResponse) {
     option (google.api.http) = { get: "/v1/users/healthz" };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "服务健康检查"
+    };
   }
+  // --- 系统级 Bilibili Cookie 管理 ---
+  // 设置系统 Bilibili Cookie (需要权限控制)
+  rpc SetSystemBilibiliCookie(SetSystemBilibiliCookieRequest) returns (SetSystemBilibiliCookieResponse) {
+    option (google.api.http) = {
+      post: "/v1/system/bilibili-cookie" // 定义 RESTful 端点
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "设置系统 Bilibili Cookie"
+      description: "设置用于 Bilibili 适配器连接直播间的系统级 Cookie。"
+    };
+  }
+  // 获取系统 Bilibili Cookie (内部服务调用)
+  rpc GetSystemBilibiliCookie(GetSystemBilibiliCookieRequest) returns (GetSystemBilibiliCookieResponse);
 }
 
-message User { string user_id = 1; string username = 2; }
-message CreateUserRequest { string username = 1; }
+message User {
+  string user_id = 1;
+  string username = 2;
+  int32 follower_count = 3;
+  // 可以添加 updated_at 等字段
+}
+message CreateUserRequest {
+  string username = 1; // 新用户的用户名
+}
 message CreateUserResponse { User user = 1; }
-message GetUserRequest { string user_id = 1; }
+message GetUserRequest { string user_id = 1; // 要获取的用户的唯一 ID
+}
 message GetUserResponse { User user = 1; }
+
+// 新增: UpdateUser 请求
+message UpdateUserRequest {
+  User user = 1; // 包含要更新的字段的 User 对象 (user_id 必须提供)
+  google.protobuf.FieldMask update_mask = 2; // 指定要更新的字段路径 (例如 "username", "follower_count")
+}
+// 新增: UpdateUser 响应
+message UpdateUserResponse { User user = 1; } // 返回更新后的 User 对象
+
 // 健康检查响应 (新增)
 message HealthCheckResponse { string status = 1; } // e.g., "SERVING"
+
+// --- Bilibili Cookie 管理消息 ---
+// 设置系统 Bilibili Cookie 请求
+message SetSystemBilibiliCookieRequest {
+  string cookie = 1; // 完整的 Bilibili Cookie 字符串
+}
+
+// 设置系统 Bilibili Cookie 响应
+message SetSystemBilibiliCookieResponse {
+  bool success = 1; // 是否成功设置
+}
+
+// 获取系统 Bilibili Cookie 请求 (通常为空)
+message GetSystemBilibiliCookieRequest {}
+
+// 获取系统 Bilibili Cookie 响应
+message GetSystemBilibiliCookieResponse {
+  string cookie = 1; // 获取到的 Bilibili Cookie 字符串
+}
+
+// --- 事件定义 ---
+
+// UserUpdatedEvent 定义用户更新事件结构
+message UserUpdatedEvent {
+  string user_id = 1;
+  // 包含关键的可更新字段
+  string username = 2;
+  int32 follower_count = 3;
+  google.protobuf.Timestamp timestamp = 10; // 事件发生时间
+}

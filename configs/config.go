@@ -1,10 +1,13 @@
 package configs
 
 import (
-	"github.com/spf13/viper"
 	"log"
 	"strings"
+
+	"github.com/spf13/viper"
 )
+
+// --- 使用 Viper 加载配置的示例 ---
 
 // Config 定义了整个应用的配置结构
 type Config struct {
@@ -13,6 +16,8 @@ type Config struct {
 	Database DatabaseConfig `mapstructure:"database"`
 	Redis    RedisConfig    `mapstructure:"redis"`
 	Nats     NatsConfig     `mapstructure:"nats"`
+	Adapter  AdapterConfig  `mapstructure:"adapter"` // <-- 新增 Adapter 配置
+	Otel     OtelConfig     `mapstructure:"otel"`    // <-- 新增: OTel 配置
 }
 
 // ServerConfig 定义了各服务的端口
@@ -64,6 +69,24 @@ type NatsConfig struct {
 	URL string `mapstructure:"url"`
 }
 
+// --- 新增: Adapter 配置 ---
+type AdapterConfig struct {
+	Bilibili BilibiliAdapterConfig `mapstructure:"bilibili"`
+}
+
+type BilibiliAdapterConfig struct {
+	ListenRoomIDs []int `mapstructure:"listen_room_ids"` // 要监听的 Bilibili 房间 ID 列表
+}
+
+// --- Adapter 配置结束 ---
+
+// --- 新增: OtelConfig 定义 OpenTelemetry 配置 ---
+type OtelConfig struct {
+	OtlpEndpoint string `mapstructure:"otlp_endpoint"` // OTLP Exporter 的 gRPC endpoint 地址
+}
+
+// --- OtelConfig 配置结束 ---
+
 // LoadConfig 从文件和环境变量加载配置
 func LoadConfig(path string) (config Config, err error) {
 	viper.AddConfigPath(path)
@@ -89,6 +112,8 @@ func LoadConfig(path string) (config Config, err error) {
 	viper.SetDefault("client.event_service.addresses", []string{"localhost:50054"})
 	viper.SetDefault("client.aggregation_service.addresses", []string{"localhost:50055"})
 	viper.SetDefault("client.realtime_service.addresses", []string{"localhost:50056"}) // 新增
+	viper.SetDefault("adapter.bilibili.listen_room_ids", []int{})                      // <-- 新增默认值 (空列表)
+	viper.SetDefault("otel.otlp_endpoint", "localhost:4317")                           // <-- 新增: OTel OTLP Endpoint 默认值
 
 	err = viper.ReadInConfig()
 	if err != nil {

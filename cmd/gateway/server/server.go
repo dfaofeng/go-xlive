@@ -18,10 +18,10 @@ func RunHTTPServer(ctx context.Context, logger *zap.Logger, addr string, handler
 	httpServer := &http.Server{
 		Addr:    addr,
 		Handler: handler,
-		// 可以添加 Read/Write/Idle 超时设置
-		// ReadTimeout:  5 * time.Second,
-		// WriteTimeout: 10 * time.Second,
-		// IdleTimeout:  120 * time.Second,
+		// 启用 Read/Write/Idle 超时设置以提高服务器健壮性
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  60 * time.Second,
 	}
 
 	go func() {

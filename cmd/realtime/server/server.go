@@ -7,12 +7,12 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+
 	// !!! 替换模块路径 !!!
 	realtimev1 "go-xlive/gen/go/realtime/v1"
 	"go-xlive/pkg/observability"
 
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
-	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health"
@@ -48,26 +48,25 @@ func NewGrpcServer(logger *zap.Logger, port int, realtimeSvc realtimev1.Realtime
 		return nil, fmt.Errorf("监听 gRPC 端口 %d 失败: %w", port, err)
 	}
 
-	otelServerHandler := otelgrpc.NewServerHandler( /* ... otel options ... */
-		otelgrpc.WithTracerProvider(otel.GetTracerProvider()),
-		otelgrpc.WithPropagators(otel.GetTextMapPropagator()),
-		otelgrpc.WithFilter(func(info *stats.RPCTagInfo) bool { /* ... filter ... */
+	// 定义 OTel 拦截器选项，包括过滤健康检查
+	otelInterceptorOpts := []otelgrpc.Option{
+		// otelgrpc.WithTracerProvider(otel.GetTracerProvider()), // 通常会自动获取全局 Provider
+		// otelgrpc.WithPropagators(otel.GetTextMapPropagator()), // 通常会自动获取全局 Propagator
+		otelgrpc.WithFilter(func(info *stats.RPCTagInfo) bool {
+			// 过滤掉健康检查的追踪。返回 true 表示 *不* 追踪这个方法。
 			return info.FullMethodName == "/grpc.health.v1.Health/Check" ||
 				info.FullMethodName == "/grpc.health.v1.Health/Watch"
 		}),
-	)
+	}
 
 	s := grpc.NewServer(
-		grpc.StatsHandler(otelServerHandler),
-		grpc.ChainUnaryInterceptor(observability.MetricsUnaryServerInterceptor()),
-		// !!! 添加 Stream 拦截器 !!!
+		grpc.ChainUnaryInterceptor(
+			otelgrpc.UnaryServerInterceptor(otelInterceptorOpts...), // 启用 OTel Unary 服务器拦截器
+			observability.MetricsUnaryServerInterceptor(),
+		),
 		grpc.ChainStreamInterceptor(
-			otelgrpc.StreamServerInterceptor( // OTEL Stream Interceptor
-				otelgrpc.WithTracerProvider(otel.GetTracerProvider()),
-				otelgrpc.WithPropagators(otel.GetTextMapPropagator()),
-			),
-			// TODO: 添加 Metrics Stream Interceptor (如果需要监控流式 RPC 指标)
-			// observability.MetricsStreamServerInterceptor(),
+			otelgrpc.StreamServerInterceptor(otelInterceptorOpts...), // 启用 OTel Stream 服务器拦截器
+			// 如果有其他 Stream 拦截器，继续链接
 		),
 	)
 
@@ -115,7 +114,7 @@ func NewMetricsServer(logger *zap.Logger, port int) *MetricsServer { /* ... 与�
 	addr := fmt.Sprintf(":%d", port)
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", observability.NewMetricsHandler())
-	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) { /*...*/ })
+	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK); w.Write([]byte("OK")) })
 	return &MetricsServer{Server: &http.Server{Addr: addr, Handler: mux}, Logger: logger, Port: port}
 }
 

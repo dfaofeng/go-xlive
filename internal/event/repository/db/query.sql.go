@@ -11,59 +11,989 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const createEvent = `-- name: CreateEvent :exec
-INSERT INTO events (session_id, room_id, event_type, user_id, event_time, data)
-VALUES ($1, $2, $3, $4, $5, $6)
+const getAllSessionEvents = `-- name: GetAllSessionEvents :many
+SELECT
+    'chat' as event_type,
+    cm.message_id as event_id,
+    cm.session_id,
+    cm.room_id,
+    cm.user_id,
+    cm.username,
+    json_build_object(
+        'content', cm.content,
+        'userlever',cm.userlever,
+        'admin',cm.admin,
+        'mobileverify',cm.mobileverify,
+        'guardlevel',cm.guardlevel,
+        'medal_upname',cm.medal_upname,
+        'medal_level',cm.medal_level,
+        'medal_name',cm.medal_name,
+        'medal_color',cm.medal_color,
+        'medal_uproomid',cm.medal_uproomid,
+        'medal_upuid',cm.medal_upuid,
+        'created_at',cm.created_at
+    )as event_data,
+    cm.timestamp
+FROM chat_messages cm
+WHERE cm.session_id = $1
+
+UNION ALL
+
+SELECT
+    'gift' as event_type,
+    gs.event_id,
+    gs.session_id,
+    gs.room_id,
+    gs.user_id,
+    gs.username,
+    json_build_object(
+        'gift_id', gs.gift_id,
+        'gift_name', gs.gift_name,
+        'gift_count', gs.gift_count,
+        'total_coin', gs.total_coin,
+        'coin_type', gs.coin_type
+    )as event_data,
+    gs.timestamp
+FROM gifts_sent gs
+WHERE gs.session_id = $1
+
+UNION ALL
+
+SELECT
+    'guard' as event_type,
+    gp.event_id,
+    gp.session_id,
+    gp.room_id,
+    gp.user_id,
+    gp.username,
+    json_build_object(
+        'guard_level', gp.guard_level,
+        'guard_name', gp.guard_name,
+        'count', gp.count,
+        'price', gp.price
+    )as event_data,
+    gp.timestamp
+FROM guard_purchases gp
+WHERE gp.session_id = $1
+
+UNION ALL
+
+SELECT
+    'superchat' as event_type,
+    scm.message_id as event_id,
+    scm.session_id,
+    scm.room_id,
+    scm.user_id,
+    scm.username,
+    json_build_object(
+        'content', scm.content,
+        'price', scm.price,
+        'duration', scm.duration
+    )as event_data,
+    scm.timestamp
+FROM super_chat_messages scm
+WHERE scm.session_id = $1
+
+UNION ALL
+
+SELECT
+    'interaction' as event_type,
+    ui.event_id,
+    ui.session_id,
+    ui.room_id,
+    ui.user_id,
+    ui.username,
+    json_build_object(
+        'interaction_type', ui.interaction_type
+    )as event_data,
+    ui.timestamp
+FROM user_interactions ui
+WHERE ui.session_id = $1
+
+UNION ALL
+
+SELECT
+    'presence' as event_type,
+    up.event_id::text,
+    up.session_id,
+    up.room_id,
+    up.user_id,
+    up.username,
+    json_build_object(
+        'entered', up.entered
+    )as event_data,
+    up.timestamp
+FROM user_presences up
+WHERE up.session_id = $1
+
+UNION ALL
+
+SELECT
+    'stream_status' as event_type,
+    ss.event_id::text,
+    ss.session_id,
+    ss.room_id,
+    '' as user_id,
+    '' as username,
+    json_build_object(
+        'is_live', ss.is_live
+    )as event_data,
+    ss.timestamp
+FROM stream_statuses ss
+WHERE ss.session_id = $1
+
+UNION ALL
+
+SELECT
+    'watched_count' as event_type,
+    wc.event_id::text,
+    wc.session_id,
+    wc.room_id,
+    '' as user_id,
+    '' as username,
+    json_build_object(
+        'count', wc.count,
+        'text_large', wc.text_large
+    )as event_data,
+    wc.timestamp
+FROM watched_count_updates wc
+WHERE wc.session_id = $1
+
+UNION ALL
+
+SELECT
+    'like_count' as event_type,
+    lc.event_id::text,
+    lc.session_id,
+    lc.room_id,
+    '' as user_id,
+    '' as username,
+    json_build_object(
+        'count', lc.count
+    )as event_data,
+    lc.timestamp
+FROM like_count_updates lc
+WHERE lc.session_id = $1
+
+UNION ALL
+
+SELECT
+    'online_rank' as event_type,
+    oru.event_id::text,
+    oru.session_id,
+    oru.room_id,
+    '' as user_id,
+    '' as username,
+    json_build_object(
+        'total_count', oru.total_count,
+        'users', (
+            SELECT json_agg(
+                json_build_object(
+                    'user_id', oru2.user_id,
+                    'username', oru2.username,
+                    'rank', oru2.rank,
+                    'score', oru2.score,
+                    'face_url', oru2.face_url
+                )
+            )
+            FROM online_rank_users oru2
+            WHERE oru2.rank_update_event_id = oru.event_id
+        )
+    )as event_data,
+    oru.timestamp
+FROM online_rank_updates oru
+WHERE oru.session_id = $1
+
+ORDER BY timestamp ASC, event_type ASC
 `
 
-type CreateEventParams struct {
-	SessionID pgtype.Text        `json:"session_id"`
-	RoomID    pgtype.Text        `json:"room_id"`
+type GetAllSessionEventsRow struct {
 	EventType string             `json:"event_type"`
-	UserID    pgtype.Text        `json:"user_id"`
-	EventTime pgtype.Timestamptz `json:"event_time"`
-	Data      []byte             `json:"data"`
+	EventID   string             `json:"event_id"`
+	SessionID string             `json:"session_id"`
+	RoomID    string             `json:"room_id"`
+	UserID    string             `json:"user_id"`
+	Username  string             `json:"username"`
+	EventData []byte             `json:"event_data"`
+	Timestamp pgtype.Timestamptz `json:"timestamp"`
 }
 
-// 存储一个事件，包含 room_id
-func (q *Queries) CreateEvent(ctx context.Context, arg CreateEventParams) error {
-	_, err := q.db.Exec(ctx, createEvent,
-		arg.SessionID,
-		arg.RoomID,
-		arg.EventType,
-		arg.UserID,
-		arg.EventTime,
-		arg.Data,
-	)
-	return err
-}
-
-const queryEventsBySessionID = `-- name: QueryEventsBySessionID :many
-SELECT event_id, session_id, room_id, event_type, user_id, event_time, data, created_at
-FROM events
-WHERE session_id = $1
-ORDER BY event_time ASC
-`
-
-// 查询指定场次的所有事件 (按时间排序)
-// TODO: 添加分页和时间范围过滤
-func (q *Queries) QueryEventsBySessionID(ctx context.Context, sessionID pgtype.Text) ([]Event, error) {
-	rows, err := q.db.Query(ctx, queryEventsBySessionID, sessionID)
+func (q *Queries) GetAllSessionEvents(ctx context.Context, sessionID string) ([]GetAllSessionEventsRow, error) {
+	rows, err := q.db.Query(ctx, getAllSessionEvents, sessionID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []Event{}
+	items := []GetAllSessionEventsRow{}
 	for rows.Next() {
-		var i Event
+		var i GetAllSessionEventsRow
+		if err := rows.Scan(
+			&i.EventType,
+			&i.EventID,
+			&i.SessionID,
+			&i.RoomID,
+			&i.UserID,
+			&i.Username,
+			&i.EventData,
+			&i.Timestamp,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const insertChatMessage = `-- name: InsertChatMessage :exec
+INSERT INTO chat_messages (
+    message_id, session_id, room_id, user_id, username, content, userlever, admin, mobileverify, guardlevel, medal_upname, medal_level, medal_name, medal_color, medal_uproomid, medal_upuid,timestamp,raw_msg
+) VALUES (
+    $1, $2, $3, $4, $5, $6, $7,$8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18
+)
+`
+
+type InsertChatMessageParams struct {
+	MessageID     string             `json:"message_id"`
+	SessionID     string             `json:"session_id"`
+	RoomID        string             `json:"room_id"`
+	UserID        string             `json:"user_id"`
+	Username      string             `json:"username"`
+	Content       string             `json:"content"`
+	Userlever     int32              `json:"userlever"`
+	Admin         bool               `json:"admin"`
+	Mobileverify  bool               `json:"mobileverify"`
+	Guardlevel    int32              `json:"guardlevel"`
+	MedalUpname   string             `json:"medal_upname"`
+	MedalLevel    pgtype.Int4        `json:"medal_level"`
+	MedalName     string             `json:"medal_name"`
+	MedalColor    pgtype.Int4        `json:"medal_color"`
+	MedalUproomid pgtype.Int4        `json:"medal_uproomid"`
+	MedalUpuid    pgtype.Int4        `json:"medal_upuid"`
+	Timestamp     pgtype.Timestamptz `json:"timestamp"`
+	RawMsg        string             `json:"raw_msg"`
+}
+
+func (q *Queries) InsertChatMessage(ctx context.Context, arg InsertChatMessageParams) error {
+	_, err := q.db.Exec(ctx, insertChatMessage,
+		arg.MessageID,
+		arg.SessionID,
+		arg.RoomID,
+		arg.UserID,
+		arg.Username,
+		arg.Content,
+		arg.Userlever,
+		arg.Admin,
+		arg.Mobileverify,
+		arg.Guardlevel,
+		arg.MedalUpname,
+		arg.MedalLevel,
+		arg.MedalName,
+		arg.MedalColor,
+		arg.MedalUproomid,
+		arg.MedalUpuid,
+		arg.Timestamp,
+		arg.RawMsg,
+	)
+	return err
+}
+
+const insertGiftSent = `-- name: InsertGiftSent :exec
+INSERT INTO gifts_sent (
+    event_id, session_id, room_id, user_id, username, gift_id, gift_name, gift_count, total_coin, coin_type, timestamp
+) VALUES (
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
+)
+`
+
+type InsertGiftSentParams struct {
+	EventID   string             `json:"event_id"`
+	SessionID string             `json:"session_id"`
+	RoomID    string             `json:"room_id"`
+	UserID    string             `json:"user_id"`
+	Username  string             `json:"username"`
+	GiftID    string             `json:"gift_id"`
+	GiftName  string             `json:"gift_name"`
+	GiftCount int32              `json:"gift_count"`
+	TotalCoin int64              `json:"total_coin"`
+	CoinType  string             `json:"coin_type"`
+	Timestamp pgtype.Timestamptz `json:"timestamp"`
+}
+
+func (q *Queries) InsertGiftSent(ctx context.Context, arg InsertGiftSentParams) error {
+	_, err := q.db.Exec(ctx, insertGiftSent,
+		arg.EventID,
+		arg.SessionID,
+		arg.RoomID,
+		arg.UserID,
+		arg.Username,
+		arg.GiftID,
+		arg.GiftName,
+		arg.GiftCount,
+		arg.TotalCoin,
+		arg.CoinType,
+		arg.Timestamp,
+	)
+	return err
+}
+
+const insertGuardPurchase = `-- name: InsertGuardPurchase :exec
+INSERT INTO guard_purchases (
+    event_id, session_id, room_id, user_id, username, guard_level, guard_name, count, price, timestamp
+) VALUES (
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
+)
+`
+
+type InsertGuardPurchaseParams struct {
+	EventID    string             `json:"event_id"`
+	SessionID  string             `json:"session_id"`
+	RoomID     string             `json:"room_id"`
+	UserID     string             `json:"user_id"`
+	Username   string             `json:"username"`
+	GuardLevel int32              `json:"guard_level"`
+	GuardName  string             `json:"guard_name"`
+	Count      int32              `json:"count"`
+	Price      int64              `json:"price"`
+	Timestamp  pgtype.Timestamptz `json:"timestamp"`
+}
+
+func (q *Queries) InsertGuardPurchase(ctx context.Context, arg InsertGuardPurchaseParams) error {
+	_, err := q.db.Exec(ctx, insertGuardPurchase,
+		arg.EventID,
+		arg.SessionID,
+		arg.RoomID,
+		arg.UserID,
+		arg.Username,
+		arg.GuardLevel,
+		arg.GuardName,
+		arg.Count,
+		arg.Price,
+		arg.Timestamp,
+	)
+	return err
+}
+
+const insertLikeCountUpdate = `-- name: InsertLikeCountUpdate :exec
+INSERT INTO like_count_updates (
+    session_id, room_id, count, timestamp
+) VALUES (
+    $1, $2, $3, $4
+)
+`
+
+type InsertLikeCountUpdateParams struct {
+	SessionID string             `json:"session_id"`
+	RoomID    string             `json:"room_id"`
+	Count     int64              `json:"count"`
+	Timestamp pgtype.Timestamptz `json:"timestamp"`
+}
+
+func (q *Queries) InsertLikeCountUpdate(ctx context.Context, arg InsertLikeCountUpdateParams) error {
+	_, err := q.db.Exec(ctx, insertLikeCountUpdate,
+		arg.SessionID,
+		arg.RoomID,
+		arg.Count,
+		arg.Timestamp,
+	)
+	return err
+}
+
+const insertNonLiveChatMessage = `-- name: InsertNonLiveChatMessage :exec
+
+INSERT INTO non_live_chat_messages (
+    message_id, room_id, user_id, username, content, userlever, admin, mobileverify, guardlevel, medal_upname, medal_level, medal_name, medal_color, medal_uproomid, medal_upuid, timestamp, raw_msg
+) VALUES (
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17
+)
+`
+
+type InsertNonLiveChatMessageParams struct {
+	MessageID     string             `json:"message_id"`
+	RoomID        string             `json:"room_id"`
+	UserID        string             `json:"user_id"`
+	Username      string             `json:"username"`
+	Content       string             `json:"content"`
+	Userlever     int32              `json:"userlever"`
+	Admin         bool               `json:"admin"`
+	Mobileverify  bool               `json:"mobileverify"`
+	Guardlevel    int32              `json:"guardlevel"`
+	MedalUpname   string             `json:"medal_upname"`
+	MedalLevel    pgtype.Int4        `json:"medal_level"`
+	MedalName     string             `json:"medal_name"`
+	MedalColor    pgtype.Int4        `json:"medal_color"`
+	MedalUproomid pgtype.Int4        `json:"medal_uproomid"`
+	MedalUpuid    pgtype.Int4        `json:"medal_upuid"`
+	Timestamp     pgtype.Timestamptz `json:"timestamp"`
+	RawMsg        string             `json:"raw_msg"`
+}
+
+// ============================================
+//
+//	Non-Live Event Inserts
+//
+// ============================================
+func (q *Queries) InsertNonLiveChatMessage(ctx context.Context, arg InsertNonLiveChatMessageParams) error {
+	_, err := q.db.Exec(ctx, insertNonLiveChatMessage,
+		arg.MessageID,
+		arg.RoomID,
+		arg.UserID,
+		arg.Username,
+		arg.Content,
+		arg.Userlever,
+		arg.Admin,
+		arg.Mobileverify,
+		arg.Guardlevel,
+		arg.MedalUpname,
+		arg.MedalLevel,
+		arg.MedalName,
+		arg.MedalColor,
+		arg.MedalUproomid,
+		arg.MedalUpuid,
+		arg.Timestamp,
+		arg.RawMsg,
+	)
+	return err
+}
+
+const insertNonLiveGiftSent = `-- name: InsertNonLiveGiftSent :exec
+INSERT INTO non_live_gifts_sent (
+    event_id, room_id, user_id, username, gift_id, gift_name, gift_count, total_coin, coin_type, timestamp
+) VALUES (
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
+)
+`
+
+type InsertNonLiveGiftSentParams struct {
+	EventID   string             `json:"event_id"`
+	RoomID    string             `json:"room_id"`
+	UserID    string             `json:"user_id"`
+	Username  string             `json:"username"`
+	GiftID    string             `json:"gift_id"`
+	GiftName  string             `json:"gift_name"`
+	GiftCount int32              `json:"gift_count"`
+	TotalCoin int64              `json:"total_coin"`
+	CoinType  string             `json:"coin_type"`
+	Timestamp pgtype.Timestamptz `json:"timestamp"`
+}
+
+func (q *Queries) InsertNonLiveGiftSent(ctx context.Context, arg InsertNonLiveGiftSentParams) error {
+	_, err := q.db.Exec(ctx, insertNonLiveGiftSent,
+		arg.EventID,
+		arg.RoomID,
+		arg.UserID,
+		arg.Username,
+		arg.GiftID,
+		arg.GiftName,
+		arg.GiftCount,
+		arg.TotalCoin,
+		arg.CoinType,
+		arg.Timestamp,
+	)
+	return err
+}
+
+const insertNonLiveGuardPurchase = `-- name: InsertNonLiveGuardPurchase :exec
+INSERT INTO non_live_guard_purchases (
+    event_id, room_id, user_id, username, guard_level, guard_name, count, price, timestamp
+) VALUES (
+    $1, $2, $3, $4, $5, $6, $7, $8, $9
+)
+`
+
+type InsertNonLiveGuardPurchaseParams struct {
+	EventID    string             `json:"event_id"`
+	RoomID     string             `json:"room_id"`
+	UserID     string             `json:"user_id"`
+	Username   string             `json:"username"`
+	GuardLevel int32              `json:"guard_level"`
+	GuardName  string             `json:"guard_name"`
+	Count      int32              `json:"count"`
+	Price      int64              `json:"price"`
+	Timestamp  pgtype.Timestamptz `json:"timestamp"`
+}
+
+func (q *Queries) InsertNonLiveGuardPurchase(ctx context.Context, arg InsertNonLiveGuardPurchaseParams) error {
+	_, err := q.db.Exec(ctx, insertNonLiveGuardPurchase,
+		arg.EventID,
+		arg.RoomID,
+		arg.UserID,
+		arg.Username,
+		arg.GuardLevel,
+		arg.GuardName,
+		arg.Count,
+		arg.Price,
+		arg.Timestamp,
+	)
+	return err
+}
+
+const insertNonLiveLikeCountUpdate = `-- name: InsertNonLiveLikeCountUpdate :exec
+INSERT INTO non_live_like_count_updates (
+    room_id, count, timestamp
+) VALUES (
+    $1, $2, $3
+)
+`
+
+type InsertNonLiveLikeCountUpdateParams struct {
+	RoomID    string             `json:"room_id"`
+	Count     int64              `json:"count"`
+	Timestamp pgtype.Timestamptz `json:"timestamp"`
+}
+
+func (q *Queries) InsertNonLiveLikeCountUpdate(ctx context.Context, arg InsertNonLiveLikeCountUpdateParams) error {
+	_, err := q.db.Exec(ctx, insertNonLiveLikeCountUpdate, arg.RoomID, arg.Count, arg.Timestamp)
+	return err
+}
+
+const insertNonLiveOnlineRankUpdate = `-- name: InsertNonLiveOnlineRankUpdate :one
+INSERT INTO non_live_online_rank_updates (
+    room_id, total_count, timestamp
+) VALUES (
+    $1, $2, $3
+) RETURNING event_id
+`
+
+type InsertNonLiveOnlineRankUpdateParams struct {
+	RoomID     string             `json:"room_id"`
+	TotalCount pgtype.Int8        `json:"total_count"`
+	Timestamp  pgtype.Timestamptz `json:"timestamp"`
+}
+
+func (q *Queries) InsertNonLiveOnlineRankUpdate(ctx context.Context, arg InsertNonLiveOnlineRankUpdateParams) (pgtype.UUID, error) {
+	row := q.db.QueryRow(ctx, insertNonLiveOnlineRankUpdate, arg.RoomID, arg.TotalCount, arg.Timestamp)
+	var event_id pgtype.UUID
+	err := row.Scan(&event_id)
+	return event_id, err
+}
+
+const insertNonLiveOnlineRankUser = `-- name: InsertNonLiveOnlineRankUser :exec
+
+INSERT INTO non_live_online_rank_users (
+    rank_update_event_id, user_id, username, rank, score, face_url
+) VALUES (
+    $1, $2, $3, $4, $5, $6
+)
+`
+
+type InsertNonLiveOnlineRankUserParams struct {
+	RankUpdateEventID pgtype.UUID `json:"rank_update_event_id"`
+	UserID            string      `json:"user_id"`
+	Username          string      `json:"username"`
+	Rank              int32       `json:"rank"`
+	Score             pgtype.Text `json:"score"`
+	FaceUrl           pgtype.Text `json:"face_url"`
+}
+
+// 返回生成的 event_id 以便关联用户
+func (q *Queries) InsertNonLiveOnlineRankUser(ctx context.Context, arg InsertNonLiveOnlineRankUserParams) error {
+	_, err := q.db.Exec(ctx, insertNonLiveOnlineRankUser,
+		arg.RankUpdateEventID,
+		arg.UserID,
+		arg.Username,
+		arg.Rank,
+		arg.Score,
+		arg.FaceUrl,
+	)
+	return err
+}
+
+const insertNonLiveSuperChatMessage = `-- name: InsertNonLiveSuperChatMessage :exec
+INSERT INTO non_live_super_chat_messages (
+    message_id, room_id, user_id, username, content, price, duration, timestamp
+) VALUES (
+    $1, $2, $3, $4, $5, $6, $7, $8
+)
+`
+
+type InsertNonLiveSuperChatMessageParams struct {
+	MessageID string             `json:"message_id"`
+	RoomID    string             `json:"room_id"`
+	UserID    string             `json:"user_id"`
+	Username  string             `json:"username"`
+	Content   string             `json:"content"`
+	Price     int64              `json:"price"`
+	Duration  int32              `json:"duration"`
+	Timestamp pgtype.Timestamptz `json:"timestamp"`
+}
+
+func (q *Queries) InsertNonLiveSuperChatMessage(ctx context.Context, arg InsertNonLiveSuperChatMessageParams) error {
+	_, err := q.db.Exec(ctx, insertNonLiveSuperChatMessage,
+		arg.MessageID,
+		arg.RoomID,
+		arg.UserID,
+		arg.Username,
+		arg.Content,
+		arg.Price,
+		arg.Duration,
+		arg.Timestamp,
+	)
+	return err
+}
+
+const insertNonLiveUserInteraction = `-- name: InsertNonLiveUserInteraction :exec
+INSERT INTO non_live_user_interactions (
+    event_id, room_id, user_id, username, interaction_type, timestamp
+) VALUES (
+    $1, $2, $3, $4, $5, $6
+)
+`
+
+type InsertNonLiveUserInteractionParams struct {
+	EventID         string             `json:"event_id"`
+	RoomID          string             `json:"room_id"`
+	UserID          string             `json:"user_id"`
+	Username        string             `json:"username"`
+	InteractionType int32              `json:"interaction_type"`
+	Timestamp       pgtype.Timestamptz `json:"timestamp"`
+}
+
+func (q *Queries) InsertNonLiveUserInteraction(ctx context.Context, arg InsertNonLiveUserInteractionParams) error {
+	_, err := q.db.Exec(ctx, insertNonLiveUserInteraction,
+		arg.EventID,
+		arg.RoomID,
+		arg.UserID,
+		arg.Username,
+		arg.InteractionType,
+		arg.Timestamp,
+	)
+	return err
+}
+
+const insertNonLiveUserPresence = `-- name: InsertNonLiveUserPresence :exec
+INSERT INTO non_live_user_presences (
+    room_id, user_id, username, entered, timestamp
+) VALUES (
+    $1, $2, $3, $4, $5
+)
+`
+
+type InsertNonLiveUserPresenceParams struct {
+	RoomID    string             `json:"room_id"`
+	UserID    string             `json:"user_id"`
+	Username  string             `json:"username"`
+	Entered   bool               `json:"entered"`
+	Timestamp pgtype.Timestamptz `json:"timestamp"`
+}
+
+func (q *Queries) InsertNonLiveUserPresence(ctx context.Context, arg InsertNonLiveUserPresenceParams) error {
+	_, err := q.db.Exec(ctx, insertNonLiveUserPresence,
+		arg.RoomID,
+		arg.UserID,
+		arg.Username,
+		arg.Entered,
+		arg.Timestamp,
+	)
+	return err
+}
+
+const insertNonLiveWatchedCountUpdate = `-- name: InsertNonLiveWatchedCountUpdate :exec
+INSERT INTO non_live_watched_count_updates (
+    room_id, count, text_large, timestamp
+) VALUES (
+    $1, $2, $3, $4
+)
+`
+
+type InsertNonLiveWatchedCountUpdateParams struct {
+	RoomID    string             `json:"room_id"`
+	Count     int64              `json:"count"`
+	TextLarge pgtype.Text        `json:"text_large"`
+	Timestamp pgtype.Timestamptz `json:"timestamp"`
+}
+
+func (q *Queries) InsertNonLiveWatchedCountUpdate(ctx context.Context, arg InsertNonLiveWatchedCountUpdateParams) error {
+	_, err := q.db.Exec(ctx, insertNonLiveWatchedCountUpdate,
+		arg.RoomID,
+		arg.Count,
+		arg.TextLarge,
+		arg.Timestamp,
+	)
+	return err
+}
+
+const insertOnlineRankUpdate = `-- name: InsertOnlineRankUpdate :one
+INSERT INTO online_rank_updates (
+    session_id, room_id, total_count, timestamp
+) VALUES (
+    $1, $2, $3, $4
+) RETURNING event_id
+`
+
+type InsertOnlineRankUpdateParams struct {
+	SessionID  string             `json:"session_id"`
+	RoomID     string             `json:"room_id"`
+	TotalCount pgtype.Int8        `json:"total_count"`
+	Timestamp  pgtype.Timestamptz `json:"timestamp"`
+}
+
+func (q *Queries) InsertOnlineRankUpdate(ctx context.Context, arg InsertOnlineRankUpdateParams) (pgtype.UUID, error) {
+	row := q.db.QueryRow(ctx, insertOnlineRankUpdate,
+		arg.SessionID,
+		arg.RoomID,
+		arg.TotalCount,
+		arg.Timestamp,
+	)
+	var event_id pgtype.UUID
+	err := row.Scan(&event_id)
+	return event_id, err
+}
+
+const insertOnlineRankUser = `-- name: InsertOnlineRankUser :exec
+
+INSERT INTO online_rank_users (
+    rank_update_event_id, user_id, username, rank, score, face_url
+) VALUES (
+    $1, $2, $3, $4, $5, $6
+)
+`
+
+type InsertOnlineRankUserParams struct {
+	RankUpdateEventID pgtype.UUID `json:"rank_update_event_id"`
+	UserID            string      `json:"user_id"`
+	Username          string      `json:"username"`
+	Rank              int32       `json:"rank"`
+	Score             pgtype.Text `json:"score"`
+	FaceUrl           pgtype.Text `json:"face_url"`
+}
+
+// 返回生成的 event_id 以便关联用户
+func (q *Queries) InsertOnlineRankUser(ctx context.Context, arg InsertOnlineRankUserParams) error {
+	_, err := q.db.Exec(ctx, insertOnlineRankUser,
+		arg.RankUpdateEventID,
+		arg.UserID,
+		arg.Username,
+		arg.Rank,
+		arg.Score,
+		arg.FaceUrl,
+	)
+	return err
+}
+
+const insertStreamStatus = `-- name: InsertStreamStatus :exec
+INSERT INTO stream_statuses (
+    session_id, room_id, is_live, timestamp
+) VALUES (
+    $1, $2, $3, $4
+)
+`
+
+type InsertStreamStatusParams struct {
+	SessionID string             `json:"session_id"`
+	RoomID    string             `json:"room_id"`
+	IsLive    bool               `json:"is_live"`
+	Timestamp pgtype.Timestamptz `json:"timestamp"`
+}
+
+func (q *Queries) InsertStreamStatus(ctx context.Context, arg InsertStreamStatusParams) error {
+	_, err := q.db.Exec(ctx, insertStreamStatus,
+		arg.SessionID,
+		arg.RoomID,
+		arg.IsLive,
+		arg.Timestamp,
+	)
+	return err
+}
+
+const insertSuperChatMessage = `-- name: InsertSuperChatMessage :exec
+INSERT INTO super_chat_messages (
+    message_id, session_id, room_id, user_id, username, content, price, duration, timestamp
+) VALUES (
+    $1, $2, $3, $4, $5, $6, $7, $8, $9
+)
+`
+
+type InsertSuperChatMessageParams struct {
+	MessageID string             `json:"message_id"`
+	SessionID string             `json:"session_id"`
+	RoomID    string             `json:"room_id"`
+	UserID    string             `json:"user_id"`
+	Username  string             `json:"username"`
+	Content   string             `json:"content"`
+	Price     int64              `json:"price"`
+	Duration  int32              `json:"duration"`
+	Timestamp pgtype.Timestamptz `json:"timestamp"`
+}
+
+func (q *Queries) InsertSuperChatMessage(ctx context.Context, arg InsertSuperChatMessageParams) error {
+	_, err := q.db.Exec(ctx, insertSuperChatMessage,
+		arg.MessageID,
+		arg.SessionID,
+		arg.RoomID,
+		arg.UserID,
+		arg.Username,
+		arg.Content,
+		arg.Price,
+		arg.Duration,
+		arg.Timestamp,
+	)
+	return err
+}
+
+const insertUserInteraction = `-- name: InsertUserInteraction :exec
+INSERT INTO user_interactions (
+    event_id, session_id, room_id, user_id, username, interaction_type, timestamp
+) VALUES (
+    $1, $2, $3, $4, $5, $6, $7
+)
+`
+
+type InsertUserInteractionParams struct {
+	EventID         string             `json:"event_id"`
+	SessionID       string             `json:"session_id"`
+	RoomID          string             `json:"room_id"`
+	UserID          string             `json:"user_id"`
+	Username        string             `json:"username"`
+	InteractionType int32              `json:"interaction_type"`
+	Timestamp       pgtype.Timestamptz `json:"timestamp"`
+}
+
+func (q *Queries) InsertUserInteraction(ctx context.Context, arg InsertUserInteractionParams) error {
+	_, err := q.db.Exec(ctx, insertUserInteraction,
+		arg.EventID,
+		arg.SessionID,
+		arg.RoomID,
+		arg.UserID,
+		arg.Username,
+		arg.InteractionType,
+		arg.Timestamp,
+	)
+	return err
+}
+
+const insertUserPresence = `-- name: InsertUserPresence :exec
+INSERT INTO user_presences (
+    session_id, room_id, user_id, username, entered, timestamp
+) VALUES (
+    $1, $2, $3, $4, $5, $6
+)
+`
+
+type InsertUserPresenceParams struct {
+	SessionID string             `json:"session_id"`
+	RoomID    string             `json:"room_id"`
+	UserID    string             `json:"user_id"`
+	Username  string             `json:"username"`
+	Entered   bool               `json:"entered"`
+	Timestamp pgtype.Timestamptz `json:"timestamp"`
+}
+
+func (q *Queries) InsertUserPresence(ctx context.Context, arg InsertUserPresenceParams) error {
+	_, err := q.db.Exec(ctx, insertUserPresence,
+		arg.SessionID,
+		arg.RoomID,
+		arg.UserID,
+		arg.Username,
+		arg.Entered,
+		arg.Timestamp,
+	)
+	return err
+}
+
+const insertWatchedCountUpdate = `-- name: InsertWatchedCountUpdate :exec
+INSERT INTO watched_count_updates (
+    session_id, room_id, count, text_large, timestamp
+) VALUES (
+    $1, $2, $3, $4, $5
+)
+`
+
+type InsertWatchedCountUpdateParams struct {
+	SessionID string             `json:"session_id"`
+	RoomID    string             `json:"room_id"`
+	Count     int64              `json:"count"`
+	TextLarge pgtype.Text        `json:"text_large"`
+	Timestamp pgtype.Timestamptz `json:"timestamp"`
+}
+
+func (q *Queries) InsertWatchedCountUpdate(ctx context.Context, arg InsertWatchedCountUpdateParams) error {
+	_, err := q.db.Exec(ctx, insertWatchedCountUpdate,
+		arg.SessionID,
+		arg.RoomID,
+		arg.Count,
+		arg.TextLarge,
+		arg.Timestamp,
+	)
+	return err
+}
+
+const queryChatMessageBySessionID = `-- name: QueryChatMessageBySessionID :many
+SELECT message_id, session_id, room_id, user_id, username, content, userlever, admin, mobileverify, guardlevel, medal_upname, medal_level, medal_name, medal_color, medal_uproomid, medal_upuid, timestamp, created_at, raw_msg FROM chat_messages
+WHERE session_id = $1
+ORDER BY timestamp ASC
+`
+
+func (q *Queries) QueryChatMessageBySessionID(ctx context.Context, sessionID string) ([]ChatMessage, error) {
+	rows, err := q.db.Query(ctx, queryChatMessageBySessionID, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ChatMessage{}
+	for rows.Next() {
+		var i ChatMessage
+		if err := rows.Scan(
+			&i.MessageID,
+			&i.SessionID,
+			&i.RoomID,
+			&i.UserID,
+			&i.Username,
+			&i.Content,
+			&i.Userlever,
+			&i.Admin,
+			&i.Mobileverify,
+			&i.Guardlevel,
+			&i.MedalUpname,
+			&i.MedalLevel,
+			&i.MedalName,
+			&i.MedalColor,
+			&i.MedalUproomid,
+			&i.MedalUpuid,
+			&i.Timestamp,
+			&i.CreatedAt,
+			&i.RawMsg,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const queryGiftSentBySessionID = `-- name: QueryGiftSentBySessionID :many
+SELECT event_id, session_id, room_id, user_id, username, gift_id, gift_name, gift_count, total_coin, coin_type, timestamp, created_at FROM gifts_sent
+WHERE session_id = $1
+ORDER BY timestamp ASC
+`
+
+// Queries for Aggregation Service
+func (q *Queries) QueryGiftSentBySessionID(ctx context.Context, sessionID string) ([]GiftsSent, error) {
+	rows, err := q.db.Query(ctx, queryGiftSentBySessionID, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GiftsSent{}
+	for rows.Next() {
+		var i GiftsSent
 		if err := rows.Scan(
 			&i.EventID,
 			&i.SessionID,
 			&i.RoomID,
-			&i.EventType,
 			&i.UserID,
-			&i.EventTime,
-			&i.Data,
+			&i.Username,
+			&i.GiftID,
+			&i.GiftName,
+			&i.GiftCount,
+			&i.TotalCoin,
+			&i.CoinType,
+			&i.Timestamp,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err
@@ -76,37 +1006,139 @@ func (q *Queries) QueryEventsBySessionID(ctx context.Context, sessionID pgtype.T
 	return items, nil
 }
 
-const queryEventsBySessionIDAndType = `-- name: QueryEventsBySessionIDAndType :many
-SELECT event_id, session_id, room_id, event_type, user_id, event_time, data, created_at
-FROM events
-WHERE session_id = $1 AND event_type = $2
-ORDER BY event_time ASC
+const queryGuardPurchaseBySessionID = `-- name: QueryGuardPurchaseBySessionID :many
+SELECT event_id, session_id, room_id, user_id, username, guard_level, guard_name, count, price, timestamp, created_at FROM guard_purchases
+WHERE session_id = $1
+ORDER BY timestamp ASC
 `
 
-type QueryEventsBySessionIDAndTypeParams struct {
-	SessionID pgtype.Text `json:"session_id"`
-	EventType string      `json:"event_type"`
-}
-
-// 查询指定场次和类型的事件
-// TODO: 添加分页和时间范围过滤
-func (q *Queries) QueryEventsBySessionIDAndType(ctx context.Context, arg QueryEventsBySessionIDAndTypeParams) ([]Event, error) {
-	rows, err := q.db.Query(ctx, queryEventsBySessionIDAndType, arg.SessionID, arg.EventType)
+func (q *Queries) QueryGuardPurchaseBySessionID(ctx context.Context, sessionID string) ([]GuardPurchase, error) {
+	rows, err := q.db.Query(ctx, queryGuardPurchaseBySessionID, sessionID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []Event{}
+	items := []GuardPurchase{}
 	for rows.Next() {
-		var i Event
+		var i GuardPurchase
 		if err := rows.Scan(
 			&i.EventID,
 			&i.SessionID,
 			&i.RoomID,
-			&i.EventType,
 			&i.UserID,
-			&i.EventTime,
-			&i.Data,
+			&i.Username,
+			&i.GuardLevel,
+			&i.GuardName,
+			&i.Count,
+			&i.Price,
+			&i.Timestamp,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const querySuperChatMessageBySessionID = `-- name: QuerySuperChatMessageBySessionID :many
+SELECT message_id, session_id, room_id, user_id, username, content, price, duration, timestamp, created_at FROM super_chat_messages
+WHERE session_id = $1
+ORDER BY timestamp ASC
+`
+
+func (q *Queries) QuerySuperChatMessageBySessionID(ctx context.Context, sessionID string) ([]SuperChatMessage, error) {
+	rows, err := q.db.Query(ctx, querySuperChatMessageBySessionID, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []SuperChatMessage{}
+	for rows.Next() {
+		var i SuperChatMessage
+		if err := rows.Scan(
+			&i.MessageID,
+			&i.SessionID,
+			&i.RoomID,
+			&i.UserID,
+			&i.Username,
+			&i.Content,
+			&i.Price,
+			&i.Duration,
+			&i.Timestamp,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const queryUserInteractionBySessionID = `-- name: QueryUserInteractionBySessionID :many
+SELECT event_id, session_id, room_id, user_id, username, interaction_type, timestamp, created_at FROM user_interactions
+WHERE session_id = $1
+ORDER BY timestamp ASC
+`
+
+func (q *Queries) QueryUserInteractionBySessionID(ctx context.Context, sessionID string) ([]UserInteraction, error) {
+	rows, err := q.db.Query(ctx, queryUserInteractionBySessionID, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []UserInteraction{}
+	for rows.Next() {
+		var i UserInteraction
+		if err := rows.Scan(
+			&i.EventID,
+			&i.SessionID,
+			&i.RoomID,
+			&i.UserID,
+			&i.Username,
+			&i.InteractionType,
+			&i.Timestamp,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const queryUserPresenceBySessionID = `-- name: QueryUserPresenceBySessionID :many
+SELECT event_id, session_id, room_id, user_id, username, entered, timestamp, created_at FROM user_presences
+WHERE session_id = $1
+ORDER BY timestamp ASC
+`
+
+func (q *Queries) QueryUserPresenceBySessionID(ctx context.Context, sessionID string) ([]UserPresence, error) {
+	rows, err := q.db.Query(ctx, queryUserPresenceBySessionID, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []UserPresence{}
+	for rows.Next() {
+		var i UserPresence
+		if err := rows.Scan(
+			&i.EventID,
+			&i.SessionID,
+			&i.RoomID,
+			&i.UserID,
+			&i.Username,
+			&i.Entered,
+			&i.Timestamp,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err

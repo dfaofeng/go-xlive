@@ -20,9 +20,12 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	UserService_CreateUser_FullMethodName  = "/user.v1.UserService/CreateUser"
-	UserService_GetUser_FullMethodName     = "/user.v1.UserService/GetUser"
-	UserService_HealthCheck_FullMethodName = "/user.v1.UserService/HealthCheck"
+	UserService_CreateUser_FullMethodName              = "/user.v1.UserService/CreateUser"
+	UserService_GetUser_FullMethodName                 = "/user.v1.UserService/GetUser"
+	UserService_UpdateUser_FullMethodName              = "/user.v1.UserService/UpdateUser"
+	UserService_HealthCheck_FullMethodName             = "/user.v1.UserService/HealthCheck"
+	UserService_SetSystemBilibiliCookie_FullMethodName = "/user.v1.UserService/SetSystemBilibiliCookie"
+	UserService_GetSystemBilibiliCookie_FullMethodName = "/user.v1.UserService/GetSystemBilibiliCookie"
 )
 
 // UserServiceClient is the client API for UserService service.
@@ -31,8 +34,15 @@ const (
 type UserServiceClient interface {
 	CreateUser(ctx context.Context, in *CreateUserRequest, opts ...grpc.CallOption) (*CreateUserResponse, error)
 	GetUser(ctx context.Context, in *GetUserRequest, opts ...grpc.CallOption) (*GetUserResponse, error)
+	// 新增: 更新用户信息 (部分更新)
+	UpdateUser(ctx context.Context, in *UpdateUserRequest, opts ...grpc.CallOption) (*UpdateUserResponse, error)
 	// 健康检查 (新增)
 	HealthCheck(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*HealthCheckResponse, error)
+	// --- 系统级 Bilibili Cookie 管理 ---
+	// 设置系统 Bilibili Cookie (需要权限控制)
+	SetSystemBilibiliCookie(ctx context.Context, in *SetSystemBilibiliCookieRequest, opts ...grpc.CallOption) (*SetSystemBilibiliCookieResponse, error)
+	// 获取系统 Bilibili Cookie (内部服务调用)
+	GetSystemBilibiliCookie(ctx context.Context, in *GetSystemBilibiliCookieRequest, opts ...grpc.CallOption) (*GetSystemBilibiliCookieResponse, error)
 }
 
 type userServiceClient struct {
@@ -61,9 +71,36 @@ func (c *userServiceClient) GetUser(ctx context.Context, in *GetUserRequest, opt
 	return out, nil
 }
 
+func (c *userServiceClient) UpdateUser(ctx context.Context, in *UpdateUserRequest, opts ...grpc.CallOption) (*UpdateUserResponse, error) {
+	out := new(UpdateUserResponse)
+	err := c.cc.Invoke(ctx, UserService_UpdateUser_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *userServiceClient) HealthCheck(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*HealthCheckResponse, error) {
 	out := new(HealthCheckResponse)
 	err := c.cc.Invoke(ctx, UserService_HealthCheck_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *userServiceClient) SetSystemBilibiliCookie(ctx context.Context, in *SetSystemBilibiliCookieRequest, opts ...grpc.CallOption) (*SetSystemBilibiliCookieResponse, error) {
+	out := new(SetSystemBilibiliCookieResponse)
+	err := c.cc.Invoke(ctx, UserService_SetSystemBilibiliCookie_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *userServiceClient) GetSystemBilibiliCookie(ctx context.Context, in *GetSystemBilibiliCookieRequest, opts ...grpc.CallOption) (*GetSystemBilibiliCookieResponse, error) {
+	out := new(GetSystemBilibiliCookieResponse)
+	err := c.cc.Invoke(ctx, UserService_GetSystemBilibiliCookie_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -76,8 +113,15 @@ func (c *userServiceClient) HealthCheck(ctx context.Context, in *emptypb.Empty, 
 type UserServiceServer interface {
 	CreateUser(context.Context, *CreateUserRequest) (*CreateUserResponse, error)
 	GetUser(context.Context, *GetUserRequest) (*GetUserResponse, error)
+	// 新增: 更新用户信息 (部分更新)
+	UpdateUser(context.Context, *UpdateUserRequest) (*UpdateUserResponse, error)
 	// 健康检查 (新增)
 	HealthCheck(context.Context, *emptypb.Empty) (*HealthCheckResponse, error)
+	// --- 系统级 Bilibili Cookie 管理 ---
+	// 设置系统 Bilibili Cookie (需要权限控制)
+	SetSystemBilibiliCookie(context.Context, *SetSystemBilibiliCookieRequest) (*SetSystemBilibiliCookieResponse, error)
+	// 获取系统 Bilibili Cookie (内部服务调用)
+	GetSystemBilibiliCookie(context.Context, *GetSystemBilibiliCookieRequest) (*GetSystemBilibiliCookieResponse, error)
 }
 
 // UnimplementedUserServiceServer should be embedded to have forward compatible implementations.
@@ -90,8 +134,17 @@ func (UnimplementedUserServiceServer) CreateUser(context.Context, *CreateUserReq
 func (UnimplementedUserServiceServer) GetUser(context.Context, *GetUserRequest) (*GetUserResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetUser not implemented")
 }
+func (UnimplementedUserServiceServer) UpdateUser(context.Context, *UpdateUserRequest) (*UpdateUserResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateUser not implemented")
+}
 func (UnimplementedUserServiceServer) HealthCheck(context.Context, *emptypb.Empty) (*HealthCheckResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method HealthCheck not implemented")
+}
+func (UnimplementedUserServiceServer) SetSystemBilibiliCookie(context.Context, *SetSystemBilibiliCookieRequest) (*SetSystemBilibiliCookieResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SetSystemBilibiliCookie not implemented")
+}
+func (UnimplementedUserServiceServer) GetSystemBilibiliCookie(context.Context, *GetSystemBilibiliCookieRequest) (*GetSystemBilibiliCookieResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetSystemBilibiliCookie not implemented")
 }
 
 // UnsafeUserServiceServer may be embedded to opt out of forward compatibility for this service.
@@ -141,6 +194,24 @@ func _UserService_GetUser_Handler(srv interface{}, ctx context.Context, dec func
 	return interceptor(ctx, in, info, handler)
 }
 
+func _UserService_UpdateUser_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateUserRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).UpdateUser(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserService_UpdateUser_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).UpdateUser(ctx, req.(*UpdateUserRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _UserService_HealthCheck_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
@@ -155,6 +226,42 @@ func _UserService_HealthCheck_Handler(srv interface{}, ctx context.Context, dec 
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(UserServiceServer).HealthCheck(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _UserService_SetSystemBilibiliCookie_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetSystemBilibiliCookieRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).SetSystemBilibiliCookie(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserService_SetSystemBilibiliCookie_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).SetSystemBilibiliCookie(ctx, req.(*SetSystemBilibiliCookieRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _UserService_GetSystemBilibiliCookie_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetSystemBilibiliCookieRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).GetSystemBilibiliCookie(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserService_GetSystemBilibiliCookie_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).GetSystemBilibiliCookie(ctx, req.(*GetSystemBilibiliCookieRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -175,8 +282,20 @@ var UserService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _UserService_GetUser_Handler,
 		},
 		{
+			MethodName: "UpdateUser",
+			Handler:    _UserService_UpdateUser_Handler,
+		},
+		{
 			MethodName: "HealthCheck",
 			Handler:    _UserService_HealthCheck_Handler,
+		},
+		{
+			MethodName: "SetSystemBilibiliCookie",
+			Handler:    _UserService_SetSystemBilibiliCookie_Handler,
+		},
+		{
+			MethodName: "GetSystemBilibiliCookie",
+			Handler:    _UserService_GetSystemBilibiliCookie_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

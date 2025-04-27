@@ -11,7 +11,6 @@ import (
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
-	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -20,18 +19,18 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	EventService_QueryEvents_FullMethodName = "/event.v1.EventService/QueryEvents"
-	EventService_HealthCheck_FullMethodName = "/event.v1.EventService/HealthCheck"
+	EventService_RecordEvent_FullMethodName         = "/event.v1.EventService/RecordEvent"
+	EventService_GetAllSessionEvents_FullMethodName = "/event.v1.EventService/GetAllSessionEvents"
 )
 
 // EventServiceClient is the client API for EventService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type EventServiceClient interface {
-	// 查询指定场次的事件
-	QueryEvents(ctx context.Context, in *QueryEventsRequest, opts ...grpc.CallOption) (*QueryEventsResponse, error)
-	// 健康检查
-	HealthCheck(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*HealthCheckResponse, error)
+	// RecordEvent 记录一个通用事件
+	RecordEvent(ctx context.Context, in *RecordEventRequest, opts ...grpc.CallOption) (*RecordEventResponse, error)
+	// GetAllSessionEvents 获取指定会话的所有事件
+	GetAllSessionEvents(ctx context.Context, in *GetAllSessionEventsRequest, opts ...grpc.CallOption) (*GetAllSessionEventsResponse, error)
 }
 
 type eventServiceClient struct {
@@ -42,18 +41,18 @@ func NewEventServiceClient(cc grpc.ClientConnInterface) EventServiceClient {
 	return &eventServiceClient{cc}
 }
 
-func (c *eventServiceClient) QueryEvents(ctx context.Context, in *QueryEventsRequest, opts ...grpc.CallOption) (*QueryEventsResponse, error) {
-	out := new(QueryEventsResponse)
-	err := c.cc.Invoke(ctx, EventService_QueryEvents_FullMethodName, in, out, opts...)
+func (c *eventServiceClient) RecordEvent(ctx context.Context, in *RecordEventRequest, opts ...grpc.CallOption) (*RecordEventResponse, error) {
+	out := new(RecordEventResponse)
+	err := c.cc.Invoke(ctx, EventService_RecordEvent_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *eventServiceClient) HealthCheck(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*HealthCheckResponse, error) {
-	out := new(HealthCheckResponse)
-	err := c.cc.Invoke(ctx, EventService_HealthCheck_FullMethodName, in, out, opts...)
+func (c *eventServiceClient) GetAllSessionEvents(ctx context.Context, in *GetAllSessionEventsRequest, opts ...grpc.CallOption) (*GetAllSessionEventsResponse, error) {
+	out := new(GetAllSessionEventsResponse)
+	err := c.cc.Invoke(ctx, EventService_GetAllSessionEvents_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -64,21 +63,21 @@ func (c *eventServiceClient) HealthCheck(ctx context.Context, in *emptypb.Empty,
 // All implementations should embed UnimplementedEventServiceServer
 // for forward compatibility
 type EventServiceServer interface {
-	// 查询指定场次的事件
-	QueryEvents(context.Context, *QueryEventsRequest) (*QueryEventsResponse, error)
-	// 健康检查
-	HealthCheck(context.Context, *emptypb.Empty) (*HealthCheckResponse, error)
+	// RecordEvent 记录一个通用事件
+	RecordEvent(context.Context, *RecordEventRequest) (*RecordEventResponse, error)
+	// GetAllSessionEvents 获取指定会话的所有事件
+	GetAllSessionEvents(context.Context, *GetAllSessionEventsRequest) (*GetAllSessionEventsResponse, error)
 }
 
 // UnimplementedEventServiceServer should be embedded to have forward compatible implementations.
 type UnimplementedEventServiceServer struct {
 }
 
-func (UnimplementedEventServiceServer) QueryEvents(context.Context, *QueryEventsRequest) (*QueryEventsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method QueryEvents not implemented")
+func (UnimplementedEventServiceServer) RecordEvent(context.Context, *RecordEventRequest) (*RecordEventResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RecordEvent not implemented")
 }
-func (UnimplementedEventServiceServer) HealthCheck(context.Context, *emptypb.Empty) (*HealthCheckResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method HealthCheck not implemented")
+func (UnimplementedEventServiceServer) GetAllSessionEvents(context.Context, *GetAllSessionEventsRequest) (*GetAllSessionEventsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetAllSessionEvents not implemented")
 }
 
 // UnsafeEventServiceServer may be embedded to opt out of forward compatibility for this service.
@@ -92,38 +91,38 @@ func RegisterEventServiceServer(s grpc.ServiceRegistrar, srv EventServiceServer)
 	s.RegisterService(&EventService_ServiceDesc, srv)
 }
 
-func _EventService_QueryEvents_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(QueryEventsRequest)
+func _EventService_RecordEvent_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RecordEventRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(EventServiceServer).QueryEvents(ctx, in)
+		return srv.(EventServiceServer).RecordEvent(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: EventService_QueryEvents_FullMethodName,
+		FullMethod: EventService_RecordEvent_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(EventServiceServer).QueryEvents(ctx, req.(*QueryEventsRequest))
+		return srv.(EventServiceServer).RecordEvent(ctx, req.(*RecordEventRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _EventService_HealthCheck_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(emptypb.Empty)
+func _EventService_GetAllSessionEvents_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetAllSessionEventsRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(EventServiceServer).HealthCheck(ctx, in)
+		return srv.(EventServiceServer).GetAllSessionEvents(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: EventService_HealthCheck_FullMethodName,
+		FullMethod: EventService_GetAllSessionEvents_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(EventServiceServer).HealthCheck(ctx, req.(*emptypb.Empty))
+		return srv.(EventServiceServer).GetAllSessionEvents(ctx, req.(*GetAllSessionEventsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -136,12 +135,12 @@ var EventService_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*EventServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "QueryEvents",
-			Handler:    _EventService_QueryEvents_Handler,
+			MethodName: "RecordEvent",
+			Handler:    _EventService_RecordEvent_Handler,
 		},
 		{
-			MethodName: "HealthCheck",
-			Handler:    _EventService_HealthCheck_Handler,
+			MethodName: "GetAllSessionEvents",
+			Handler:    _EventService_GetAllSessionEvents_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

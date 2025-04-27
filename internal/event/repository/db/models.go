@@ -8,13 +8,248 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-type Event struct {
+type ChatMessage struct {
+	MessageID     string             `json:"message_id"`
+	SessionID     string             `json:"session_id"`
+	RoomID        string             `json:"room_id"`
+	UserID        string             `json:"user_id"`
+	Username      string             `json:"username"`
+	Content       string             `json:"content"`
+	Userlever     int32              `json:"userlever"`
+	Admin         bool               `json:"admin"`
+	Mobileverify  bool               `json:"mobileverify"`
+	Guardlevel    int32              `json:"guardlevel"`
+	MedalUpname   string             `json:"medal_upname"`
+	MedalLevel    pgtype.Int4        `json:"medal_level"`
+	MedalName     string             `json:"medal_name"`
+	MedalColor    pgtype.Int4        `json:"medal_color"`
+	MedalUproomid pgtype.Int4        `json:"medal_uproomid"`
+	MedalUpuid    pgtype.Int4        `json:"medal_upuid"`
+	Timestamp     pgtype.Timestamptz `json:"timestamp"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	RawMsg        string             `json:"raw_msg"`
+}
+
+type GiftsSent struct {
+	EventID   string             `json:"event_id"`
+	SessionID string             `json:"session_id"`
+	RoomID    string             `json:"room_id"`
+	UserID    string             `json:"user_id"`
+	Username  string             `json:"username"`
+	GiftID    string             `json:"gift_id"`
+	GiftName  string             `json:"gift_name"`
+	GiftCount int32              `json:"gift_count"`
+	TotalCoin int64              `json:"total_coin"`
+	CoinType  string             `json:"coin_type"`
+	Timestamp pgtype.Timestamptz `json:"timestamp"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
+type GuardPurchase struct {
+	EventID    string             `json:"event_id"`
+	SessionID  string             `json:"session_id"`
+	RoomID     string             `json:"room_id"`
+	UserID     string             `json:"user_id"`
+	Username   string             `json:"username"`
+	GuardLevel int32              `json:"guard_level"`
+	GuardName  string             `json:"guard_name"`
+	Count      int32              `json:"count"`
+	Price      int64              `json:"price"`
+	Timestamp  pgtype.Timestamptz `json:"timestamp"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+}
+
+type LikeCountUpdate struct {
 	EventID   pgtype.UUID        `json:"event_id"`
-	SessionID pgtype.Text        `json:"session_id"`
-	RoomID    pgtype.Text        `json:"room_id"`
-	EventType string             `json:"event_type"`
-	UserID    pgtype.Text        `json:"user_id"`
-	EventTime pgtype.Timestamptz `json:"event_time"`
-	Data      []byte             `json:"data"`
+	SessionID string             `json:"session_id"`
+	RoomID    string             `json:"room_id"`
+	Count     int64              `json:"count"`
+	Timestamp pgtype.Timestamptz `json:"timestamp"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
+type NonLiveChatMessage struct {
+	MessageID     string             `json:"message_id"`
+	RoomID        string             `json:"room_id"`
+	UserID        string             `json:"user_id"`
+	Username      string             `json:"username"`
+	Content       string             `json:"content"`
+	Userlever     int32              `json:"userlever"`
+	Admin         bool               `json:"admin"`
+	Mobileverify  bool               `json:"mobileverify"`
+	Guardlevel    int32              `json:"guardlevel"`
+	MedalUpname   string             `json:"medal_upname"`
+	MedalLevel    pgtype.Int4        `json:"medal_level"`
+	MedalName     string             `json:"medal_name"`
+	MedalColor    pgtype.Int4        `json:"medal_color"`
+	MedalUproomid pgtype.Int4        `json:"medal_uproomid"`
+	MedalUpuid    pgtype.Int4        `json:"medal_upuid"`
+	Timestamp     pgtype.Timestamptz `json:"timestamp"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	RawMsg        string             `json:"raw_msg"`
+}
+
+type NonLiveGiftsSent struct {
+	EventID   string             `json:"event_id"`
+	RoomID    string             `json:"room_id"`
+	UserID    string             `json:"user_id"`
+	Username  string             `json:"username"`
+	GiftID    string             `json:"gift_id"`
+	GiftName  string             `json:"gift_name"`
+	GiftCount int32              `json:"gift_count"`
+	TotalCoin int64              `json:"total_coin"`
+	CoinType  string             `json:"coin_type"`
+	Timestamp pgtype.Timestamptz `json:"timestamp"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
+type NonLiveGuardPurchase struct {
+	EventID    string             `json:"event_id"`
+	RoomID     string             `json:"room_id"`
+	UserID     string             `json:"user_id"`
+	Username   string             `json:"username"`
+	GuardLevel int32              `json:"guard_level"`
+	GuardName  string             `json:"guard_name"`
+	Count      int32              `json:"count"`
+	Price      int64              `json:"price"`
+	Timestamp  pgtype.Timestamptz `json:"timestamp"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+}
+
+type NonLiveLikeCountUpdate struct {
+	EventID   pgtype.UUID        `json:"event_id"`
+	RoomID    string             `json:"room_id"`
+	Count     int64              `json:"count"`
+	Timestamp pgtype.Timestamptz `json:"timestamp"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
+type NonLiveOnlineRankUpdate struct {
+	EventID    pgtype.UUID        `json:"event_id"`
+	RoomID     string             `json:"room_id"`
+	TotalCount pgtype.Int8        `json:"total_count"`
+	Timestamp  pgtype.Timestamptz `json:"timestamp"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+}
+
+type NonLiveOnlineRankUser struct {
+	RankUpdateEventID pgtype.UUID `json:"rank_update_event_id"`
+	UserID            string      `json:"user_id"`
+	Username          string      `json:"username"`
+	Rank              int32       `json:"rank"`
+	Score             pgtype.Text `json:"score"`
+	FaceUrl           pgtype.Text `json:"face_url"`
+}
+
+type NonLiveSuperChatMessage struct {
+	MessageID string             `json:"message_id"`
+	RoomID    string             `json:"room_id"`
+	UserID    string             `json:"user_id"`
+	Username  string             `json:"username"`
+	Content   string             `json:"content"`
+	Price     int64              `json:"price"`
+	Duration  int32              `json:"duration"`
+	Timestamp pgtype.Timestamptz `json:"timestamp"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
+type NonLiveUserInteraction struct {
+	EventID         string             `json:"event_id"`
+	RoomID          string             `json:"room_id"`
+	UserID          string             `json:"user_id"`
+	Username        string             `json:"username"`
+	InteractionType int32              `json:"interaction_type"`
+	Timestamp       pgtype.Timestamptz `json:"timestamp"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+}
+
+type NonLiveUserPresence struct {
+	EventID   pgtype.UUID        `json:"event_id"`
+	RoomID    string             `json:"room_id"`
+	UserID    string             `json:"user_id"`
+	Username  string             `json:"username"`
+	Entered   bool               `json:"entered"`
+	Timestamp pgtype.Timestamptz `json:"timestamp"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
+type NonLiveWatchedCountUpdate struct {
+	EventID   pgtype.UUID        `json:"event_id"`
+	RoomID    string             `json:"room_id"`
+	Count     int64              `json:"count"`
+	TextLarge pgtype.Text        `json:"text_large"`
+	Timestamp pgtype.Timestamptz `json:"timestamp"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
+type OnlineRankUpdate struct {
+	EventID    pgtype.UUID        `json:"event_id"`
+	SessionID  string             `json:"session_id"`
+	RoomID     string             `json:"room_id"`
+	TotalCount pgtype.Int8        `json:"total_count"`
+	Timestamp  pgtype.Timestamptz `json:"timestamp"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+}
+
+type OnlineRankUser struct {
+	RankUpdateEventID pgtype.UUID `json:"rank_update_event_id"`
+	UserID            string      `json:"user_id"`
+	Username          string      `json:"username"`
+	Rank              int32       `json:"rank"`
+	Score             pgtype.Text `json:"score"`
+	FaceUrl           pgtype.Text `json:"face_url"`
+}
+
+type StreamStatus struct {
+	EventID   pgtype.UUID        `json:"event_id"`
+	SessionID string             `json:"session_id"`
+	RoomID    string             `json:"room_id"`
+	IsLive    bool               `json:"is_live"`
+	Timestamp pgtype.Timestamptz `json:"timestamp"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
+type SuperChatMessage struct {
+	MessageID string             `json:"message_id"`
+	SessionID string             `json:"session_id"`
+	RoomID    string             `json:"room_id"`
+	UserID    string             `json:"user_id"`
+	Username  string             `json:"username"`
+	Content   string             `json:"content"`
+	Price     int64              `json:"price"`
+	Duration  int32              `json:"duration"`
+	Timestamp pgtype.Timestamptz `json:"timestamp"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
+type UserInteraction struct {
+	EventID         string             `json:"event_id"`
+	SessionID       string             `json:"session_id"`
+	RoomID          string             `json:"room_id"`
+	UserID          string             `json:"user_id"`
+	Username        string             `json:"username"`
+	InteractionType int32              `json:"interaction_type"`
+	Timestamp       pgtype.Timestamptz `json:"timestamp"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+}
+
+type UserPresence struct {
+	EventID   pgtype.UUID        `json:"event_id"`
+	SessionID string             `json:"session_id"`
+	RoomID    string             `json:"room_id"`
+	UserID    string             `json:"user_id"`
+	Username  string             `json:"username"`
+	Entered   bool               `json:"entered"`
+	Timestamp pgtype.Timestamptz `json:"timestamp"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
+type WatchedCountUpdate struct {
+	EventID   pgtype.UUID        `json:"event_id"`
+	SessionID string             `json:"session_id"`
+	RoomID    string             `json:"room_id"`
+	Count     int64              `json:"count"`
+	TextLarge pgtype.Text        `json:"text_large"`
+	Timestamp pgtype.Timestamptz `json:"timestamp"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }

@@ -7,19 +7,24 @@ package db
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createRoom = `-- name: CreateRoom :one
-INSERT INTO rooms (room_id, room_name, owner_user_id, status)
-VALUES ($1, $2, $3, $4)
-    RETURNING room_id, room_name, owner_user_id, status, created_at
+INSERT INTO rooms (room_id, room_name, owner_user_id, status, platform, platform_room_id, area_name)
+VALUES ($1, $2, $3, $4, $5, $6, $7) -- 添加 $7 for area_name
+    RETURNING room_id, room_name, owner_user_id, status, platform, platform_room_id, area_name, created_at, anchor_name, deleted_at
 `
 
 type CreateRoomParams struct {
-	RoomID      string `json:"room_id"`
-	RoomName    string `json:"room_name"`
-	OwnerUserID string `json:"owner_user_id"`
-	Status      string `json:"status"`
+	RoomID         string      `json:"room_id"`
+	RoomName       string      `json:"room_name"`
+	OwnerUserID    string      `json:"owner_user_id"`
+	Status         string      `json:"status"`
+	Platform       string      `json:"platform"`
+	PlatformRoomID string      `json:"platform_room_id"`
+	AreaName       pgtype.Text `json:"area_name"`
 }
 
 // 创建一个新房间，并返回创建后的所有字段
@@ -29,6 +34,9 @@ func (q *Queries) CreateRoom(ctx context.Context, arg CreateRoomParams) (Room, e
 		arg.RoomName,
 		arg.OwnerUserID,
 		arg.Status,
+		arg.Platform,
+		arg.PlatformRoomID,
+		arg.AreaName,
 	)
 	var i Room
 	err := row.Scan(
@@ -36,19 +44,36 @@ func (q *Queries) CreateRoom(ctx context.Context, arg CreateRoomParams) (Room, e
 		&i.RoomName,
 		&i.OwnerUserID,
 		&i.Status,
+		&i.Platform,
+		&i.PlatformRoomID,
+		&i.AreaName,
 		&i.CreatedAt,
+		&i.AnchorName,
+		&i.DeletedAt,
 	)
 	return i, err
 }
 
+const deleteRoom = `-- name: DeleteRoom :exec
+UPDATE rooms
+SET deleted_at = NOW()
+WHERE room_id = $1 AND deleted_at IS NULL
+`
+
+// 根据房间 ID 软删除房间 (更新 deleted_at)
+func (q *Queries) DeleteRoom(ctx context.Context, roomID string) error {
+	_, err := q.db.Exec(ctx, deleteRoom, roomID)
+	return err
+}
+
 const getRoomByID = `-- name: GetRoomByID :one
-SELECT room_id, room_name, owner_user_id, status, created_at
+SELECT room_id, room_name, owner_user_id, status, platform, platform_room_id, area_name, created_at, anchor_name, deleted_at
 FROM rooms
-WHERE room_id = $1
+WHERE room_id = $1 AND deleted_at IS NULL
     LIMIT 1
 `
 
-// 根据房间 ID 查询房间信息
+// 根据房间 ID 查询房间信息 (仅限未删除)
 func (q *Queries) GetRoomByID(ctx context.Context, roomID string) (Room, error) {
 	row := q.db.QueryRow(ctx, getRoomByID, roomID)
 	var i Room
@@ -57,7 +82,193 @@ func (q *Queries) GetRoomByID(ctx context.Context, roomID string) (Room, error) 
 		&i.RoomName,
 		&i.OwnerUserID,
 		&i.Status,
+		&i.Platform,
+		&i.PlatformRoomID,
+		&i.AreaName,
 		&i.CreatedAt,
+		&i.AnchorName,
+		&i.DeletedAt,
+	)
+	return i, err
+}
+
+const getRoomByPlatformID = `-- name: GetRoomByPlatformID :one
+SELECT room_id, room_name, owner_user_id, status, platform, platform_room_id, area_name, created_at, anchor_name, deleted_at
+FROM rooms
+WHERE platform = $1 AND platform_room_id = $2 AND deleted_at IS NULL
+LIMIT 1
+`
+
+type GetRoomByPlatformIDParams struct {
+	Platform       string `json:"platform"`
+	PlatformRoomID string `json:"platform_room_id"`
+}
+
+// 根据平台和平台房间 ID 查询房间信息 (仅限未删除)
+func (q *Queries) GetRoomByPlatformID(ctx context.Context, arg GetRoomByPlatformIDParams) (Room, error) {
+	row := q.db.QueryRow(ctx, getRoomByPlatformID, arg.Platform, arg.PlatformRoomID)
+	var i Room
+	err := row.Scan(
+		&i.RoomID,
+		&i.RoomName,
+		&i.OwnerUserID,
+		&i.Status,
+		&i.Platform,
+		&i.PlatformRoomID,
+		&i.AreaName,
+		&i.CreatedAt,
+		&i.AnchorName,
+		&i.DeletedAt,
+	)
+	return i, err
+}
+
+const listRooms = `-- name: ListRooms :many
+SELECT room_id, room_name, owner_user_id, status, platform, platform_room_id, area_name, created_at, anchor_name, deleted_at
+FROM rooms
+WHERE
+    deleted_at IS NULL -- 仅查询未删除的房间
+AND
+    -- 如果 status_filter 不为 NULL，则按 status 过滤
+    ($1::text IS NULL OR status = $1)
+AND
+    ($2::text IS NULL OR platform = $2)
+ORDER BY created_at DESC
+LIMIT $4::int
+OFFSET $3::int
+`
+
+type ListRoomsParams struct {
+	StatusFilter   pgtype.Text `json:"status_filter"`
+	PlatformFilter pgtype.Text `json:"platform_filter"`
+	PageOffset     int32       `json:"page_offset"`
+	PageLimit      int32       `json:"page_limit"`
+}
+
+// 列出房间，支持按状态和平台过滤 (仅限未删除)
+// 如果 platform_filter 不为 NULL，则按 platform 过滤
+func (q *Queries) ListRooms(ctx context.Context, arg ListRoomsParams) ([]Room, error) {
+	rows, err := q.db.Query(ctx, listRooms,
+		arg.StatusFilter,
+		arg.PlatformFilter,
+		arg.PageOffset,
+		arg.PageLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Room{}
+	for rows.Next() {
+		var i Room
+		if err := rows.Scan(
+			&i.RoomID,
+			&i.RoomName,
+			&i.OwnerUserID,
+			&i.Status,
+			&i.Platform,
+			&i.PlatformRoomID,
+			&i.AreaName,
+			&i.CreatedAt,
+			&i.AnchorName,
+			&i.DeletedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const updateRoom = `-- name: UpdateRoom :one
+UPDATE rooms
+SET
+    room_name = $2,
+    owner_user_id = $3, -- 理论上 owner 不应该变，但以防万一
+    status = $4,
+    platform = $5, -- 平台通常也不变
+    platform_room_id = $6, -- 平台房间 ID 通常也不变
+    area_name = $7
+WHERE room_id = $1 AND deleted_at IS NULL
+RETURNING room_id, room_name, owner_user_id, status, platform, platform_room_id, area_name, created_at, anchor_name, deleted_at
+`
+
+type UpdateRoomParams struct {
+	RoomID         string      `json:"room_id"`
+	RoomName       string      `json:"room_name"`
+	OwnerUserID    string      `json:"owner_user_id"`
+	Status         string      `json:"status"`
+	Platform       string      `json:"platform"`
+	PlatformRoomID string      `json:"platform_room_id"`
+	AreaName       pgtype.Text `json:"area_name"`
+}
+
+// 更新房间信息 (Service 层会先 Get 再根据 FieldMask 决定更新哪些字段) (仅限未删除)
+func (q *Queries) UpdateRoom(ctx context.Context, arg UpdateRoomParams) (Room, error) {
+	row := q.db.QueryRow(ctx, updateRoom,
+		arg.RoomID,
+		arg.RoomName,
+		arg.OwnerUserID,
+		arg.Status,
+		arg.Platform,
+		arg.PlatformRoomID,
+		arg.AreaName,
+	)
+	var i Room
+	err := row.Scan(
+		&i.RoomID,
+		&i.RoomName,
+		&i.OwnerUserID,
+		&i.Status,
+		&i.Platform,
+		&i.PlatformRoomID,
+		&i.AreaName,
+		&i.CreatedAt,
+		&i.AnchorName,
+		&i.DeletedAt,
+	)
+	return i, err
+}
+
+const updateRoomPlatformInfo = `-- name: UpdateRoomPlatformInfo :one
+
+UPDATE rooms
+SET room_name = $2, anchor_name = $3, area_name = $4
+WHERE room_id = $1 AND deleted_at IS NULL -- 确保只更新未删除的房间
+RETURNING room_id, room_name, owner_user_id, status, platform, platform_room_id, area_name, created_at, anchor_name, deleted_at
+`
+
+type UpdateRoomPlatformInfoParams struct {
+	RoomID     string      `json:"room_id"`
+	RoomName   string      `json:"room_name"`
+	AnchorName pgtype.Text `json:"anchor_name"`
+	AreaName   pgtype.Text `json:"area_name"`
+}
+
+// 确保只软删除一次
+// 根据 NATS 事件更新房间的平台特定信息 (room_name, anchor_name, area_name)
+func (q *Queries) UpdateRoomPlatformInfo(ctx context.Context, arg UpdateRoomPlatformInfoParams) (Room, error) {
+	row := q.db.QueryRow(ctx, updateRoomPlatformInfo,
+		arg.RoomID,
+		arg.RoomName,
+		arg.AnchorName,
+		arg.AreaName,
+	)
+	var i Room
+	err := row.Scan(
+		&i.RoomID,
+		&i.RoomName,
+		&i.OwnerUserID,
+		&i.Status,
+		&i.Platform,
+		&i.PlatformRoomID,
+		&i.AreaName,
+		&i.CreatedAt,
+		&i.AnchorName,
+		&i.DeletedAt,
 	)
 	return i, err
 }
@@ -65,8 +276,8 @@ func (q *Queries) GetRoomByID(ctx context.Context, roomID string) (Room, error) 
 const updateRoomStatus = `-- name: UpdateRoomStatus :one
 UPDATE rooms
 SET status = $2
-WHERE room_id = $1
-    RETURNING room_id, room_name, owner_user_id, status, created_at
+WHERE room_id = $1 AND deleted_at IS NULL
+    RETURNING room_id, room_name, owner_user_id, status, platform, platform_room_id, area_name, created_at, anchor_name, deleted_at
 `
 
 type UpdateRoomStatusParams struct {
@@ -74,7 +285,7 @@ type UpdateRoomStatusParams struct {
 	Status string `json:"status"`
 }
 
-// 更新指定房间的状态，并返回更新后的记录
+// 更新指定房间的状态，并返回更新后的记录 (仅限未删除)
 func (q *Queries) UpdateRoomStatus(ctx context.Context, arg UpdateRoomStatusParams) (Room, error) {
 	row := q.db.QueryRow(ctx, updateRoomStatus, arg.RoomID, arg.Status)
 	var i Room
@@ -83,7 +294,12 @@ func (q *Queries) UpdateRoomStatus(ctx context.Context, arg UpdateRoomStatusPara
 		&i.RoomName,
 		&i.OwnerUserID,
 		&i.Status,
+		&i.Platform,
+		&i.PlatformRoomID,
+		&i.AreaName,
 		&i.CreatedAt,
+		&i.AnchorName,
+		&i.DeletedAt,
 	)
 	return i, err
 }

@@ -10,26 +10,46 @@ import (
 )
 
 const createUser = `-- name: CreateUser :one
-INSERT INTO users (user_id, username)
-VALUES ($1, $2)
-    RETURNING user_id, username, created_at
+INSERT INTO users (user_id, username, follower_count)
+VALUES ($1, $2, $3) -- 添加 $3 for follower_count
+    RETURNING user_id, username, follower_count, created_at
 `
 
 type CreateUserParams struct {
-	UserID   string `json:"user_id"`
-	Username string `json:"username"`
+	UserID        string `json:"user_id"`
+	Username      string `json:"username"`
+	FollowerCount int32  `json:"follower_count"`
 }
 
 // 创建一个新用户，并返回创建后的所有字段
+// !!! 修正: 添加 follower_count (通常插入默认值 0) !!!
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
-	row := q.db.QueryRow(ctx, createUser, arg.UserID, arg.Username)
+	row := q.db.QueryRow(ctx, createUser, arg.UserID, arg.Username, arg.FollowerCount)
 	var i User
-	err := row.Scan(&i.UserID, &i.Username, &i.CreatedAt)
+	err := row.Scan(
+		&i.UserID,
+		&i.Username,
+		&i.FollowerCount,
+		&i.CreatedAt,
+	)
 	return i, err
 }
 
+const getSystemSetting = `-- name: GetSystemSetting :one
+SELECT setting_value FROM system_settings
+WHERE setting_key = $1
+`
+
+// 获取一个系统设置项的值
+func (q *Queries) GetSystemSetting(ctx context.Context, settingKey string) (string, error) {
+	row := q.db.QueryRow(ctx, getSystemSetting, settingKey)
+	var setting_value string
+	err := row.Scan(&setting_value)
+	return setting_value, err
+}
+
 const getUserByID = `-- name: GetUserByID :one
-SELECT user_id, username, created_at
+SELECT user_id, username, follower_count, created_at
 FROM users
 WHERE user_id = $1
     LIMIT 1
@@ -39,6 +59,60 @@ WHERE user_id = $1
 func (q *Queries) GetUserByID(ctx context.Context, userID string) (User, error) {
 	row := q.db.QueryRow(ctx, getUserByID, userID)
 	var i User
-	err := row.Scan(&i.UserID, &i.Username, &i.CreatedAt)
+	err := row.Scan(
+		&i.UserID,
+		&i.Username,
+		&i.FollowerCount,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const setSystemSetting = `-- name: SetSystemSetting :exec
+
+INSERT INTO system_settings (setting_key, setting_value, updated_at)
+VALUES ($1, $2, NOW())
+ON CONFLICT (setting_key) DO UPDATE SET
+    setting_value = EXCLUDED.setting_value,
+    updated_at = NOW()
+`
+
+type SetSystemSettingParams struct {
+	SettingKey   string `json:"setting_key"`
+	SettingValue string `json:"setting_value"`
+}
+
+// --- System Settings ---
+// 设置或更新一个系统设置项
+func (q *Queries) SetSystemSetting(ctx context.Context, arg SetSystemSettingParams) error {
+	_, err := q.db.Exec(ctx, setSystemSetting, arg.SettingKey, arg.SettingValue)
+	return err
+}
+
+const updateUser = `-- name: UpdateUser :one
+UPDATE users
+SET
+    username = $2,
+    follower_count = $3
+WHERE user_id = $1
+RETURNING user_id, username, follower_count, created_at
+`
+
+type UpdateUserParams struct {
+	UserID        string `json:"user_id"`
+	Username      string `json:"username"`
+	FollowerCount int32  `json:"follower_count"`
+}
+
+// 更新用户信息 (Service 层会先 Get 再根据 FieldMask 决定更新哪些字段)
+func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error) {
+	row := q.db.QueryRow(ctx, updateUser, arg.UserID, arg.Username, arg.FollowerCount)
+	var i User
+	err := row.Scan(
+		&i.UserID,
+		&i.Username,
+		&i.FollowerCount,
+		&i.CreatedAt,
+	)
 	return i, err
 }

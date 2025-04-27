@@ -3,20 +3,18 @@ package client
 
 import (
 	"fmt"
+	"go-xlive/configs"
+	agggw "go-xlive/gen/go/aggregation/v1"
 	eventv1 "go-xlive/gen/go/event/v1"
+	realtimev1 "go-xlive/gen/go/realtime/v1"
 	roomv1 "go-xlive/gen/go/room/v1"
 	sessionv1 "go-xlive/gen/go/session/v1"
 	userv1 "go-xlive/gen/go/user/v1"
-	"log" // 用于关键初始化错误
-	"strings"
-	// !!! 替换模块路径 !!!
-	"go-xlive/configs"
-	agggw "go-xlive/gen/go/aggregation/v1"
-	realtimev1 "go-xlive/gen/go/realtime/v1"
 	"go-xlive/pkg/observability" // 需要 Metrics 拦截器
+	"log"                        // 用于关键初始化错误
+	"strings"
 
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
-	"go.opentelemetry.io/otel"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/balancer/roundrobin"
 	"google.golang.org/grpc/credentials/insecure"
@@ -66,19 +64,25 @@ func (c *Clients) Close() {
 // NewClients 创建并初始化所有 gRPC 客户端
 func NewClients(cfg configs.ClientConfig) (*Clients, error) {
 	// --- 创建 OTEL gRPC 客户端 Stats Handler ---
-	otelClientHandler := otelgrpc.NewClientHandler(
-		otelgrpc.WithTracerProvider(otel.GetTracerProvider()),
-		otelgrpc.WithPropagators(otel.GetTextMapPropagator()),
-	)
+	//otelClientHandler := otelgrpc.NewClientHandler(
+	//	otelgrpc.WithTracerProvider(otel.GetTracerProvider()),
+	//	otelgrpc.WithPropagators(otel.GetTextMapPropagator()),
+	//)
 	// --- gRPC 连接选项 ---
 	loadBalancingConfig := fmt.Sprintf(`{"loadBalancingConfig": [{"%s":{}}]}`, roundrobin.Name)
 	grpcOpts := []grpc.DialOption{
 		grpc.WithTransportCredentials(insecure.NewCredentials()), // 注意：生产环境需要安全凭证
-		grpc.WithStatsHandler(otelClientHandler),
-		grpc.WithChainUnaryInterceptor(
-			observability.MetricsUnaryClientInterceptor(), // 添加 Metrics 拦截器
+		//grpc.WithStatsHandler(otelClientHandler), // StatsHandler 已被拦截器取代
+		grpc.WithChainUnaryInterceptor( // 添加 Unary 拦截器链
+			otelgrpc.UnaryClientInterceptor(),             // OTel 追踪拦截器
+			observability.MetricsUnaryClientInterceptor(), // Metrics 拦截器
 		),
-		grpc.WithDefaultServiceConfig(loadBalancingConfig),
+		grpc.WithChainStreamInterceptor( // <-- 新增: 添加 Stream 拦截器链
+			otelgrpc.StreamClientInterceptor(), // OTel 追踪拦截器
+			// 如果需要，也可以添加 Stream 的 Metrics 拦截器
+			// observability.MetricsStreamClientInterceptor(),
+		),
+		grpc.WithDefaultServiceConfig(loadBalancingConfig), // 启用轮询负载均衡
 	}
 
 	// --- 连接 User Service ---
@@ -195,12 +199,13 @@ func NewClients(cfg configs.ClientConfig) (*Clients, error) {
 // GetDefaultGrpcClientOptions 示例函数 (应放在 client 包中)
 // 这里仅作演示，实际应放在 client/clients.go
 func (c *Clients) GetDefaultGrpcClientOptions() []grpc.DialOption {
-	otelClientHandler := otelgrpc.NewClientHandler( /* ... */ )
+	//otelClientHandler := otelgrpc.NewClientHandler( /* ... */ )
 	loadBalancingConfig := fmt.Sprintf(`{"loadBalancingConfig": [{"%s":{}}]}`, roundrobin.Name)
 	return []grpc.DialOption{
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithStatsHandler(otelClientHandler),
-		grpc.WithChainUnaryInterceptor(observability.MetricsUnaryClientInterceptor()),
+		//grpc.WithStatsHandler(otelClientHandler),
+		grpc.WithChainUnaryInterceptor(observability.MetricsUnaryClientInterceptor(), otelgrpc.UnaryClientInterceptor()),
+		grpc.WithChainStreamInterceptor(otelgrpc.StreamClientInterceptor()), // <-- 确保这里也有 Stream 拦截器
 		grpc.WithDefaultServiceConfig(loadBalancingConfig),
 	}
 }

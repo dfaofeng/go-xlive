@@ -5,11 +5,14 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"log"
+	"go-xlive/pkg/log"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/otel"
 
 	// !!! 替换模块路径 !!!
 	"go-xlive/cmd/gateway/client"  // 导入 client 包
@@ -31,22 +34,30 @@ func main() {
 	// --- 配置加载 ---
 	configPath := flag.String("config", "./configs", "配置文件路径")
 	flag.Parse()
+	// 本地加载配置
 	cfg, err := configs.LoadConfig(*configPath)
 	if err != nil {
-		log.Fatalf("无法加载配置: %v", err)
+		// 使用 zap logger 替换 log.Fatalf
+		zap.L().Fatal("无法加载配置", zap.String("path", *configPath), zap.Error(err))
 	}
-
 	// --- 日志初始化 ---
-	logger, _ := zap.NewProduction()
+	logger := log.Init_Logger(serviceName, ".")
 	defer logger.Sync()
 	logger.Info("API 网关正在启动...", zap.String("service", serviceName))
 
 	// --- 初始化 TracerProvider ---
-	tpShutdown, err := observability.InitTracerProvider(serviceName)
+	// <-- 修改: 传递 cfg.Otel
+	tpShutdown, err := observability.InitTracerProvider(serviceName, cfg.Otel)
 	if err != nil {
 		logger.Fatal("初始化 TracerProvider 失败", zap.Error(err))
 	}
-	defer tpShutdown(context.Background())
+	// !!! 确保在日志之后，客户端之前，尽早 defer !!!
+	defer func() {
+		// 使用带有超时的后台 context 进行关闭
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		tpShutdown(shutdownCtx)
+	}()
 	logger.Info("TracerProvider 初始化完成")
 
 	// --- 初始化 gRPC 客户端 ---
@@ -64,14 +75,12 @@ func main() {
 
 	// --- 创建 gRPC-Gateway Mux 并注册 Handlers ---
 	restMux := runtime.NewServeMux()
-	// 获取 gRPC Dial 选项 (含拦截器和 LB 配置) - 这部分可以移到 client 包或保持在此
-	c, _ := client.NewClients(cfg.Client)
-	grpcOpts := c.GetDefaultGrpcClientOptions() // 假设 client 包提供此函数
+	grpcOpts := grpcClients.GetDefaultGrpcClientOptions() // 假设 client.Clients 提供此方法
 	err = handler.RegisterGrpcGatewayHandlers(
 		context.Background(), // 使用后台 Context 注册
 		restMux,
 		grpcOpts,
-		cfg.Client.UserService.Addresses[0], // 简化，仍然只取第一个地址
+		cfg.Client.UserService.Addresses[0],
 		cfg.Client.RoomService.Addresses[0],
 		cfg.Client.SessionService.Addresses[0],
 		cfg.Client.EventService.Addresses[0],
@@ -84,16 +93,22 @@ func main() {
 	}
 
 	// --- 创建并配置主 HTTP 路由器 ---
-	mainRouter := router.NewRouter(logger, grpcClients.Realtime, restMux, wsHub) // 传入依赖
+	mainRouter := router.NewRouter(logger, grpcClients.Realtime, grpcClients.Session, grpcClients.Event, restMux, wsHub) // 传入依赖
 	logger.Info("主 HTTP 路由器已配置")
-
+	// *** HTTP 服务器插桩 ***
+	// 使用 otelhttp 包装主路由器。 "gateway-http-server" 是这个 Span 的操作名。
+	instrumentedRouter := otelhttp.NewHandler(mainRouter, "gateway-http-server",
+		otelhttp.WithTracerProvider(otel.GetTracerProvider()), // 明确指定 Provider
+		otelhttp.WithPropagators(otel.GetTextMapPropagator()), // 明确指定 Propagator
+	)
+	logger.Info("HTTP 路由器已使用 OpenTelemetry 进行插桩")
 	// --- 启动 HTTP 服务器 ---
 	httpPort := cfg.Server.Gateway.HttpPort
 	if httpPort == 0 {
 		httpPort = 8080
 	}
 	listenAddr := fmt.Sprintf(":%d", httpPort)
-	httpServer, errChan := server.RunHTTPServer(context.Background(), logger, listenAddr, mainRouter)
+	httpServer, errChan := server.RunHTTPServer(context.Background(), logger, listenAddr, instrumentedRouter)
 	logger.Info("HTTP 服务器已启动")
 
 	// --- 优雅关闭处理 ---
